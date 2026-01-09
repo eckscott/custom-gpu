@@ -82,11 +82,12 @@ module updownbuttoncount(
     // Instance the OneShot module
     oneshot d_os (.clk(clk), .rst(rst), .in(btnl_sync), .os(dec_sw_count));
 
-    // 16-bit Counter. Increments once each time button is pressed.
+    // 16-bit Counter. Increments once each time button-up is pressed,
+    // decrements once each time button-down is pressed, increments
+    // the value of the switches (sw) each time button-left is pressed,
+    // and decrements the value of the switches (sw) each time button-right
+    // is pressed
     //
-    //  CODING STANDARD: Every "segment/block" of your RTL code must have at least
-    //  one line of white space between it and the previous and following block. Also,
-    //  ALL always blocks must have a coment.
     always_ff@(posedge clk)
         if (rst)
             count_i <= 0;
