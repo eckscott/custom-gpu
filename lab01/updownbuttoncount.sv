@@ -34,7 +34,7 @@ module updownbuttoncount(
     // The internal 16-bit count signal.
     logic [15:0] count_i;
     // The increment counter output from the one shot module
-    logic inc1_count, dec1_count, inc_sw_count, dec_sw_cnt;
+    logic inc1_count, dec1_count, inc_sw_count, dec_sw_count;
     logic btnu_sync, btnd_sync, btnl_sync, btnr_sync;
     // reset signal
     logic rst;
@@ -60,27 +60,27 @@ module updownbuttoncount(
     synchronizer d_sync (.clk(clk), .rst(rst), .in(btnd), .out(btnd_sync));
 
     // Instance the OneShot module
-    oneshot d_os (.clk(clk), .rst(rst), .in(btnu_sync), .os(dec1_count));
+    oneshot d_os (.clk(clk), .rst(rst), .in(btnd_sync), .os(dec1_count));
 
     /********************************************************
     ************ synchronizer & oneshot for btnl ************
     ********************************************************/
 
     // Instance the synchronizer for btnl
-    synchronizer d_sync (.clk(clk), .rst(rst), .in(btnl), .out(btnl_sync));
+    synchronizer l_sync (.clk(clk), .rst(rst), .in(btnl), .out(btnl_sync));
 
     // Instance the OneShot module
-    oneshot d_os (.clk(clk), .rst(rst), .in(btnl_sync), .os(inc_sw_count));
+    oneshot l_os (.clk(clk), .rst(rst), .in(btnl_sync), .os(inc_sw_count));
 
     /********************************************************
     ************ synchronizer & oneshot for btnr ************
     ********************************************************/
 
     // Instance the synchronizer for btnr
-    synchronizer d_sync (.clk(clk), .rst(rst), .in(btnr), .out(btnr_sync));
+    synchronizer r_sync (.clk(clk), .rst(rst), .in(btnr), .out(btnr_sync));
 
     // Instance the OneShot module
-    oneshot d_os (.clk(clk), .rst(rst), .in(btnl_sync), .os(dec_sw_count));
+    oneshot r_os (.clk(clk), .rst(rst), .in(btnr_sync), .os(dec_sw_count));
 
     // 16-bit Counter. Increments once each time button-up is pressed,
     // decrements once each time button-down is pressed, increments
