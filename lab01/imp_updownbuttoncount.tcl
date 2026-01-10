@@ -1,9 +1,17 @@
-# imp_updownbuttoncount.tcl
+##########################################################################
+#
+# Filename: imp_updownbuttoncount.tcl
+#
+# Author: Ethan Scott
+# Class: ECEN 423, Sec 01, Winter 2026
+# Date: 9 January 2026
 #
 # This Tcl script is used to perform implementation
 # (placement, routing, and timing analysis) on the updownbuttoncount design.
 # It requires the updownbuttoncount_synth.dcp file generated from
 # the synthesis step.
+#
+##########################################################################
 
 # Read the synthesized design checkpoint file
 open_checkpoint updownbuttoncount_synth.dcp

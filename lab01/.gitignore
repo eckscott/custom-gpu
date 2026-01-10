@@ -8,7 +8,7 @@ vivado*.str
 # Waveform and simulation files
 *.wdb
 sim_updownbuttoncount_tb*.log
-updownbuttoncount_synth*.log
+synth_updownbuttoncount*.log
 
 # Implementation files
 updownbuttoncount_imp*.log

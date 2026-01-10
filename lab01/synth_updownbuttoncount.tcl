@@ -1,6 +1,14 @@
-# synth_updownbuttoncount.tcl
+##########################################################################
 #
-# This Tcl script is used to synthesize the updownbuttoncount design.
+# Filename: updownbuttoncount_sim.tcl
+#
+# Author: Ethan Scott
+# Class: ECEN 423, Sec 01, Winter 2026
+# Date: 9 January 2026
+#
+# This .tcl script is used to synthesize the updownbuttoncount design
+#
+##########################################################################
 
 # Read the verilog files into the synthesis tool
 read_verilog -sv updownbuttoncount.sv

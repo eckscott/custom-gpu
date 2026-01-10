@@ -7,7 +7,8 @@
 * File: updownbuttoncount.sv
 *
 * Author: Ethan Scott
-*
+* Class: ECEN 423, Sec 01, Winter 2026
+* Date: 9 January 2026
 * Module: updownbuttoncount
 *
 * Description:

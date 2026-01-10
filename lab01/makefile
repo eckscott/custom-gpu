@@ -37,3 +37,4 @@ clean:
 	rm -f updownbuttoncount_synth.dcp updownbuttoncount_synth*.log
 	rm -f updownbuttoncount.bit updownbuttoncount.dcp
 	rm -f clockInfo.txt updownbuttoncount_timing.rpt updownbuttoncount_utilization.rpt updownbuttoncount_imp*.log
+	rm -f vivado.log
