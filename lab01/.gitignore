@@ -14,3 +14,6 @@ synth_updownbuttoncount*.log
 updownbuttoncount_imp*.log
 updownbuttoncount_timing.rpt
 updownbuttoncount_utilization.rpt
+
+# Any other logs
+*.log
