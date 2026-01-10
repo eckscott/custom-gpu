@@ -22,7 +22,7 @@ sim_updownbuttoncount_tb: elab_updownbuttoncount_tb
 ################################
 
 updownbuttoncount_synth.dcp: synth_updownbuttoncount.tcl updownbuttoncount.sv
-	vivado -mode batch -script synth_updownbuttoncount.tcl -nojournal -log updownbuttoncount_synth.log
+	vivado -mode batch -script synth_updownbuttoncount.tcl -nojournal -log synth_updownbuttoncount.log
 
 updownbuttoncount.bit: updownbuttoncount_synth.dcp
 	vivado -mode batch -script imp_updownbuttoncount.tcl -log updownbuttoncount_imp.log
