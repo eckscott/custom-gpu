@@ -1,10 +1,12 @@
 ##########################################################################
 #
-# updownbuttoncount_sim.tcl
+# alu_sim.tcl
 # Author: Ethan Scott
 # Class: ECEN 423
 #
-# This .tcl script will apply the input stimulus to the alu design
+# This .tcl script will apply the input stimulus to the alu design. This
+# tcl file compares the output to the values previously calculated in the
+# preliminary section of this lab
 #
 ##########################################################################
 
