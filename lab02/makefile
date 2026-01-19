@@ -17,6 +17,15 @@ sim_alu_gui: elab_alu
 sim_tb_alu: elab_tb_alu
 	xsim tb_alu --log sim_tb_alu.log --runall
 
+analyze_calc: calc.sv alu.sv ../include/synchronizer.sv ../include/oneshot.sv
+	xvlog -i ../include $^ -sv --nolog
+
+elab_calc: analyze_calc
+	xelab calc -debug typical -nolog
+
+sim_calc_gui: elab_calc
+	xsim calc -gui --nolog
+
 ################################
 # Implementation
 ################################

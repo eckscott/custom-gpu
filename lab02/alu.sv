@@ -32,6 +32,10 @@ module alu(
         output logic [31:0] result
     );
 
+    /* The combinational logic block that performs an arithmetic operation
+    *  on the two operands based on the value of alu_op. alu_op constants are
+    *  defined in the riscv_alu_constants header file included at the top
+    */
     always_comb begin
         case(alu_op)
             AND_OP:

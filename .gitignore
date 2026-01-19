@@ -12,6 +12,7 @@ xsim*.jou
 .Xil/*
 xsim.dir
 xelab.pb
+*.wdb
 
 # pycache
 **/__pycache__/*

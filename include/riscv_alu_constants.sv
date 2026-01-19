@@ -11,7 +11,8 @@
 *    for alu functionality.
 *
 ****************************************************************************/
- 
+`ifndef RISCV_ALU_CONSTANTS
+`define RISCV_ALU_CONSTANTS
     // Various possible alu_op commands
     localparam AND_OP = 4'b0000;
     localparam OR_OP = 4'b0001;
@@ -22,3 +23,4 @@
     localparam SLL_OP = 4'b1001;
     localparam SRA_OP = 4'b1010;
     localparam XOR_OP = 4'b1101;
+`endif
