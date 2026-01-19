@@ -33,8 +33,6 @@ module calc(
     logic btnd_sync, update_accum, alu_zero;
     logic rst;
     logic [3:0] alu_op;
-    
-    localparam SE_NEG = 16'b1111_1111_1111_1111;
 
     assign rst = btnu;
 
