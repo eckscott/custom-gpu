@@ -14,20 +14,18 @@ module tb_regfile_top();
 	logic [15:0] tb_led;
     logic [15:0] tb_sw;
 
+    // clock generation
+    initial begin
+        tb_clk = 0;
+        forever #5 tb_clk <= ~tb_clk; // 100MHz clock
+    end
+
 	// Instance regfile module
     regfile_top my_datapath(.clk(tb_clk), .btnc(tb_btnc), .sw(tb_sw), .btnd(tb_btnd),
         .btnl(tb_btnl), .btnu(tb_btnu), .led(tb_led));
 
     datapathBehavioralModel model(.clk(tb_clk), .btnc(tb_btnc), .sw(tb_sw), .btnd(tb_btnd),
         .btnl(tb_btnl), .btnu(tb_btnu), .led(tb_led));
-
-    task sim_clocks(input int clocks);
-		automatic int i;
-		for(i=0; i < clocks; i=i+1) begin
-			//@(negedge tb_clk);
-            #5 tb_clk = 1; #5 tb_clk = 0;
-        end
-    endtask
 
     localparam POST_SW_CLOCKS = 6;
     localparam BUTTON_HIGH_CLOCKS = 3;
@@ -46,39 +44,39 @@ module tb_regfile_top();
     // Load the address register
     task load_addr_reg(input [4:0] rd, input [4:0] rs1, input [4:0] rs2);
         tb_sw = (rd << 10) | (rs2 << 5) | rs1;
-        sim_clocks(POST_SW_CLOCKS);
+        repeat(POST_SW_CLOCKS) @(negedge tb_clk);
         // Press btnl
         tb_btnl = 1;
-        sim_clocks(BUTTON_HIGH_CLOCKS);
+        repeat(BUTTON_HIGH_CLOCKS) @(negedge tb_clk);
         // release btnl
         tb_btnl = 0;
-        sim_clocks(POST_BUTTON_CLOCKS);
+        repeat(POST_BUTTON_CLOCKS) @(negedge tb_clk);
     endtask
 
     // Execute an operation (2 phases: load address register and issue operation)
     task execute_op(input [4:0] rd, input [4:0] rs1, input [4:0] rs2, input [3:0] op);
         load_addr_reg(rd,rs1,rs2);
-        sim_clocks(10);
+        repeat(10) @(negedge tb_clk);
         // Load operation (lower 4 bits of k)
         tb_sw = op;
-        sim_clocks(POST_SW_CLOCKS);
+        repeat(POST_SW_CLOCKS) @(negedge tb_clk);
         tb_btnc = 1;
-        sim_clocks(BUTTON_HIGH_CLOCKS);
+        repeat(BUTTON_HIGH_CLOCKS) @(negedge tb_clk);
         tb_btnc = 0;
-        sim_clocks(POST_BUTTON_CLOCKS);
+        repeat(POST_BUTTON_CLOCKS) @(negedge tb_clk);
     endtask
 
     // Load a register with a value
     task load_reg(input [4:0] rd, input [14:0] value);
         load_addr_reg(rd,rd,0);
-        sim_clocks(10);
+        repeat(10) @(negedge tb_clk);
         // Load value into register
         tb_sw = 16'h8000 | value;
-        sim_clocks(POST_SW_CLOCKS);
+        repeat(POST_SW_CLOCKS) @(negedge tb_clk);
         tb_btnc = 1;
-        sim_clocks(BUTTON_HIGH_CLOCKS);
+        repeat(BUTTON_HIGH_CLOCKS) @(negedge tb_clk);
         tb_btnc = 0;
-        sim_clocks(POST_BUTTON_CLOCKS);
+        repeat(POST_BUTTON_CLOCKS) @(negedge tb_clk);
     endtask
 
 	initial begin
@@ -91,7 +89,7 @@ module tb_regfile_top();
 		#50
 		
 		// execute a few clocks without any reset
-        sim_clocks(3);
+        repeat(3) @(negedge tb_clk);
 
 		// set deaults
         tb_btnd = 0;
@@ -99,12 +97,12 @@ module tb_regfile_top();
         tb_btnl = 0;
         tb_sw = 0;
         tb_btnu = 0;
-        sim_clocks(2);
+        repeat(2) @(negedge tb_clk);
         // Issue reset
         tb_btnu = 1;
-        sim_clocks(1);
+        repeat(1) @(negedge tb_clk);
 		tb_btnu = 0;
-        sim_clocks(2);
+        repeat(2) @(negedge tb_clk);
 		
         // Put initial values into all of the registers
 		for(i=0; i < 32; i=i+1) begin
@@ -114,7 +112,7 @@ module tb_regfile_top();
         // Put a -1 in register 1
         load_reg(1, -1);
 
-        sim_clocks(30);
+        repeat(30) @(negedge tb_clk);
         // Invert some registers using XOR
 		for(i=2; i < 6; i=i+1) begin
             execute_op(i,1,i,ALUOP_XOR); // XOR
@@ -159,16 +157,17 @@ module tb_regfile_top();
             // Read lower half of register
             tb_btnd = 0;
             load_addr_reg(i,i,i);
-            sim_clocks(BUTTON_HIGH_CLOCKS+POST_BUTTON_CLOCKS);
+            repeat(BUTTON_HIGH_CLOCKS+POST_BUTTON_CLOCKS) @(negedge tb_clk);
             #1
             // Read upper half of register
             tb_btnd = 1;
-            sim_clocks(BUTTON_HIGH_CLOCKS+POST_BUTTON_CLOCKS);
+            repeat(BUTTON_HIGH_CLOCKS+POST_BUTTON_CLOCKS) @(negedge tb_clk);
             #1
             tb_btnd = 0;
         end
 
 		$display("*** Successful simulation. Ended at %0t *** ", $time);
+        $display("===== TEST PASSED =====");
         $finish;
         
 	end  // end initial

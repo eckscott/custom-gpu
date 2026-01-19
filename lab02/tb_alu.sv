@@ -10,7 +10,7 @@
 // Note for Instructor and TA's: If this testbench is modified, make sure that the exercise questions from the learning  
 // suite lab report are accurate with corresponding the simulation timing and answer. 
 
-module tb_alu();
+module tb_alu #(int NUM_RANDOM_TESTS=25)();
 
     logic zero;
     logic [31:0] op1, op2, result;
@@ -58,44 +58,29 @@ module tb_alu();
         '{32'h00000001, 32'h00000002}  // Last dummy entry
     };
 
+    // ALU operation type
     typedef enum logic [3:0] {
-        AND  = 4'h0,
-        OR   = 4'h1,
-        ADD  = 4'h2,
-        SUB  = 4'h6,
-        LT   = 4'h7,        
-        SRL  = 4'h8,
-        SLL = 4'h9,
-        SRA  = 4'hA,
-        XOR  = 4'hD
-    } opcode_t;
+        AND  = 4'b0000,
+        OR   = 4'b0001,
+        ADD  = 4'b0010,
+        SUB  = 4'b0110,
+        LT   = 4'b0111,        
+        SRL  = 4'b1000,
+        SLL  = 4'b1001,
+        SRA  = 4'b1010,
+        XOR  = 4'b1101
+    } aluop_t;
 
-    localparam[3:0] UNDEFINED_OP1 = 4'b0100;
-    localparam[3:0] UNDEFINED_OP2 = 4'b0101;
-    localparam[3:0] UNDEFINED_OP3 = 4'b0011;
-    localparam[3:0] UNDEFINED_OP4 = 4'b1011;
-    localparam[3:0] UNDEFINED_OP5 = 4'b1100;
-    localparam[3:0] UNDEFINED_OP6 = 4'b1110;
-    localparam[3:0] UNDEFINED_OP7 = 4'b1111;
-    localparam[3:0] ALUOP_AND = 4'b0000;
-    localparam[3:0] ALUOP_OR = 4'b0001;
-    localparam[3:0] ALUOP_ADD = 4'b0010;
-    localparam[3:0] ALUOP_SUB = 4'b0110;
-    localparam[3:0] ALUOP_LT = 4'b0111;
-    localparam[3:0] ALUOP_SRL = 4'b1000;
-    localparam[3:0] ALUOP_SLL = 4'b1001;
-    localparam[3:0] ALUOP_SRA = 4'b1010;
-    localparam[3:0] ALUOP_XOR = 4'b1101;
-
-    // Constants for the operands of the deterministic ALU test
-    localparam[31:0] OP1_VAL = 32'h12345678;
-    localparam[31:0] OP2_VAL = 32'h2456fdec;
-    // Number of random tests per ALU op
-    localparam NUM_RANDOM_TESTS = 15;
-
-    localparam non_specified_alu_op_tests = 2;
-    localparam specified_alu_op_tests = 16;
-
+    // ALU operation type constants
+    localparam aluop_t ALUOP_AND = AND;
+    localparam aluop_t ALUOP_OR = OR;
+    localparam aluop_t ALUOP_ADD = ADD;
+    localparam aluop_t ALUOP_SUB = SUB;
+    localparam aluop_t ALUOP_LT = LT;
+    localparam aluop_t ALUOP_SRL = SRL;
+    localparam aluop_t ALUOP_SLL = SLL;
+    localparam aluop_t ALUOP_SRA = SRA;
+    localparam aluop_t ALUOP_XOR = XOR;
 
     // Function to check if inputs are defined
     function logic [15:0] inputs_defined();
@@ -106,7 +91,7 @@ module tb_alu();
 
     // function to check if the outputs are defined
     function logic [15:0] results_defined();
-        if (^result === 1'bX)
+        if (^result === 1'bX || ^zero === 1'bX)
             results_defined = 0;
         else
             results_defined = 1;
@@ -116,41 +101,40 @@ module tb_alu();
     task sim_alu_op;
         input [3:0] operation;
         input [31:0] operand1, operand2;
-        string opname;
-        opcode_t op;
-        op = opcode_t'(operation);
+        aluop_t op;
+        op = aluop_t'(operation);
         begin
             op1 = operand1;
             op2 = operand2;
             alu_op = operation;
-            #5
+            #5 // There is no clock so using a delay
             $display("[%0t] %08h %s (%04b) %08h = %08h (zero=%b)", $time, op1, op.name(), 
                 operation, op2, result, zero);
-            #5
-            ;
+            #5;
         end
     endtask
 
     // Task for simulating all ALU operations with predefined vectors
     task sim_alu_vectors;
-        opcode_t op;
+        aluop_t alu_op;
         begin
-            for (op = op.first(); op != op.last(); op = op.next()) begin
-                $display("Testing opcode = %s (0x%0h)", op.name(), op);
+            for (alu_op = alu_op.first(); alu_op != alu_op.last(); alu_op = alu_op.next()) begin
+                $display("Testing opcode = %s (0x%0h)", alu_op.name(), alu_op);
                 foreach (test_instructions[i])
-                    sim_alu_op(op,test_instructions[i].operandA,test_instructions[i].operandB);
+                    sim_alu_op(alu_op,test_instructions[i].operandA,test_instructions[i].operandB);
             end            
         end
     endtask
 
-    // Task for simulating a single ALU operation multiple times with random inputs
+    // Task for simulating random inputs on all ALU operations
     task sim_alu_op_random;
-        input [3:0] operation;
         input int num_tests;
-        int i;
+        aluop_t alu_op;
+        integer i;
         begin
             for(i=0; i < num_tests; i=i+1) begin
-                sim_alu_op(operation,$urandom,$urandom);
+                for (alu_op = alu_op.first(); alu_op != alu_op.last(); alu_op = alu_op.next())
+                    sim_alu_op(alu_op,$urandom,$urandom);
             end
         end
     endtask
@@ -161,7 +145,6 @@ module tb_alu();
     // Start of simulation
     initial begin
         int i,j,test_count;
-         
         //shall print %t with scaled in ns (-9), with 2 precision digits, and would print the " ns" string
         $timeformat(-9, 0, " ns", 20);
         $display("*** Start of ALU Testbench Simulation ***");
@@ -175,28 +158,12 @@ module tb_alu();
         op2 = 0;
         #50
 
+        // Test each ALU operation with predefined vectors
         sim_alu_vectors();
-        // Perform a few deterministic tests with no random inputs
-        sim_alu_op(ALUOP_AND, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_OR, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_ADD, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_SUB, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_LT, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_SRL, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_SLL, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_SRA, OP1_VAL, OP2_VAL);
-        sim_alu_op(ALUOP_XOR, OP1_VAL, OP2_VAL);
 
         // Test all control inputs with random stimulus
-        sim_alu_op_random(ALUOP_AND, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_OR, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_ADD, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_SUB, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_LT, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_SRL, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_SLL, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_SRA, NUM_RANDOM_TESTS);
-        sim_alu_op_random(ALUOP_XOR, NUM_RANDOM_TESTS);
+        $display("*** Random Testsb ***");
+        sim_alu_op_random(NUM_RANDOM_TESTS);
 
         if (errors != 0) begin
             $display("*** Simulation Failed ***");
@@ -243,6 +210,7 @@ module tb_alu();
         if (inputs_defined()) begin
             if (!results_defined()) begin
                 $display("[%0t] ****Error****: Invalid result (x's)", $time);
+                errors = errors + 1;
                 // $fatal;
             end
             else begin

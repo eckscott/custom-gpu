@@ -85,8 +85,8 @@ module tb_calc();
         if (op == '1) $write("btnd pressed. ");
         else $write("btnd NOT pressed. ");
         $write("sw=%04h l,c,r=%03b (%s) ", sw, button_op, button_op.name());
-        // Wait a few clock cycles for the oneshot to propagate and then test the LEDs
-        repeat(3) @(negedge tb_clk); 
+        // Wait a few clock cycles for the synchronizer and oneshot to propagate and then test the LEDs
+        repeat(5) @(negedge tb_clk); 
         $display("next led = %04h", tb_count);
         if (~check_led_output()) begin
             errors = errors + 1;

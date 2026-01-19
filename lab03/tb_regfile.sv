@@ -4,11 +4,6 @@
 //
 //  Filename: tb_regfile.sv
 //
-//  Author: Mike Wirthlin
-//  
-//  Description: 
-//
-//
 //////////////////////////////////////////////////////////////////////////////////
 
 // Note for Instructor and TA's: If this testbench is modified, make sure that the exercise questions from the learning  
@@ -20,7 +15,13 @@ module tb_regfile();
     logic tb_init = 0;
     logic [4:0] regAddrA, regAddrB, regAddrWrite;
     logic [31:0] regWriteData, regReadDataA, regReadDataB;
+    integer num_random = 300;
 
+    // clock generation
+    initial begin
+        tb_clk = 0;
+        forever #5 tb_clk <= ~tb_clk; // 100MHz clock
+    end
 
 	// Instance regfile module
     regfile my_regfile(.clk(tb_clk), .readReg1(regAddrA), .readReg2(regAddrB), .writeReg(regAddrWrite),
@@ -31,29 +32,29 @@ module tb_regfile();
                              .regWriteData(regWriteData), .regWrite(tb_write), .regReadDataA(regReadDataA),
                              .regReadDataB(regReadDataB));
 
-    // Issue a specified number of clock cycles
-    task sim_clocks(input int clocks);
-		automatic int i;
-		for(i=0; i < clocks; i=i+1) begin
-			//@(negedge tb_clk);
-            #5 tb_clk = 1; #5 tb_clk = 0;
-        end
+    task register_event(input logic [4:0] addrA, input logic [4:0] addrB, 
+        input logic [4:0] addrW, input logic [31:0] data, input logic write_en = '0);
+        @(negedge tb_clk);
+        regAddrWrite=addrW;
+        regWriteData=data;
+        regAddrA=addrA;
+        regAddrB=addrB;
+        tb_write = write_en;
+        $write("[%0t] A=%08h B=%08h:", $time, regReadDataA, regReadDataB);
+        $write(" addrA=%02h addrB=%02h addrW=%02h, we=%01b dataW=%08h", regAddrA, regAddrB, regAddrWrite, write_en, regWriteData);
+        @(negedge tb_clk);
+        tb_write = 0;
+        $display(" : dataA=%08h dataB=%08h", regReadDataA, regReadDataB);
     endtask
 
     // Write a word to the register file
     task write_word(input [4:0] addr, input [31:0] data);
-        regAddrWrite=addr;
-        regWriteData=data;
-        tb_write = 1;
-        #5 tb_clk = 1; #5 tb_clk = 0;
-        tb_write = 0;
+        register_event(0, 0, addr, data, 1);
     endtask
 
     // Read words from the register file
     task read_words(input [4:0] addrA, input [4:0] addrB);
-        regAddrA=addrA;
-        regAddrB=addrB; 
-        #5 tb_clk = 1; #5 tb_clk = 0;
+        register_event(addrA, addrB, 0, 0, 0);
     endtask
 
 	initial begin
@@ -61,85 +62,66 @@ module tb_regfile();
 
         //shall print %t with scaled in ns (-9), with 2 precision digits, and would print the " ns" string
 		$timeformat(-9, 0, " ns", 20);
-		$display("*** Start of Regfile Testbench Simulation ***");
-		
+		$display("*** Start of Regfile Testbench Simulation ***");		
 		// Run for some time without valid inputs
-		#50
-		
+		#50		
 		// execute a few clocks without any initialization
-        sim_clocks(3);
-
+        repeat(3) @(negedge tb_clk);
         // Initilize inputs
         regAddrA=0;
         regAddrB=0; 
         regAddrWrite=0;
         regWriteData=0;
         tb_write = 0;
-
         // Run a few clock cycles.
-        sim_clocks(5);
-
+        repeat(3) @(negedge tb_clk);
         tb_init = 1;
-        sim_clocks(1);
-
-        // Check to see if all register values are initiqlized to zero
+        @(negedge tb_clk);
+        // Check to see if all register values are initialized to zero
 		$display("*** Read initial values of register at time %0t", $time);
-        for(i=0; i < 32; i=i+1) begin
+        for(i=0; i < 32; i=i+1)
             read_words(i,i);
-            sim_clocks(1);
-        end
+        repeat(5) @(negedge tb_clk);
 
 		$display("*** Testing x0 register at time %0t", $time);
-        // Write non-zero values to register x0
-        for(i=0; i < 32; i=i+1) begin
-            write_word(0,(i+1)*255);
-            sim_clocks(1);
-        end
-        sim_clocks(5);
-
+        // Write non-zero values to register x0 (simultaneous write/and read to x0)
+        for(i=0; i < 32; i=i+1)
+            register_event(0, 0, 0, $urandom, 1);
+        repeat(5) @(negedge tb_clk);
         // initialize memories (with non-zero value in 0)
 		$display("*** Testing write to each register at %0t", $time);
         for(i=1; i < 32; i=i+1) begin
             write_word(i,i);
             read_words(i,i);
         end
-        sim_clocks(5);
+        repeat(5) @(negedge tb_clk);
 
         // Perform simultaneous reads and writes to the same register
 		$display("*** Testing simultaneous reads and writes to each register at %0t", $time);
-        for(i=1; i < 32; i=i+1) begin
-            regAddrA=i;
-            regAddrB=i; 
-            write_word(i,i|i<<8|i<<16|i<<24);
-        end
-        sim_clocks(5);
+        for(i=0; i < 32; i=i+1)
+            register_event(i, i-1, i, i|i<<8|i<<16|i<<24, 1);
+        repeat(5) @(negedge tb_clk);
 
         // read contents of memory
 		$display("*** Testing different read addresses at %0t", $time);
-        for(i=0; i < 32; i=i+1) begin
+        for(i=0; i < 32; i=i+1)
             read_words(i,~i);
-        end
 
         // simulate some transactions
-		$display("*** Testing random transaactions at %0t", $time);
-        for(i=0; i < 300; i=i+1) begin
+		$display("*** Testing random transactions at %0t", $time);
+        for(i=0; i < num_random; i=i+1) begin
             j=$urandom_range(0,3);
             regAddrA=$urandom_range(0,31);
             regAddrB=~$urandom_range(0,31);
-            if (j==0) begin
-                //write
-                write_word($urandom_range(0,31),$urandom);
-            end
-            else begin
-                // read only            
-                #5 tb_clk = 1; #5 tb_clk = 0;
-            end
+            register_event($urandom_range(0,31), $urandom_range(0,31), $urandom_range(0,31),
+                i|i<<8|i<<16|i<<24, (j==0));
         end
 
 		// Random delay
-        sim_clocks($urandom_range(30,50));		
+        repeat(30) @(negedge tb_clk);
 
 		$display("*** Successful simulation. Ended at %0t *** ", $time);
+        $display("===== TEST PASSED =====");
         $finish;
         
 	end  // end initial
@@ -184,11 +166,11 @@ module regfileBehavioralModel(clk, initialized, regAddrA, regAddrB, regAddrWrite
 				$finish;
 			end
 			if (^regReadDataB[0] === 1'bX) begin
-				$display("**** Error: 'x' Values on B read port at time %0t", $time);
+				$display("**** Error: 'x' Values on B read port at time %0t (is memory initialized?)", $time);
 				$finish;
 			end
 			if (^regReadDataA[0] === 1'bX) begin
-				$display("**** Error: 'x' Values on A read port at time %0t", $time);
+				$display("**** Error: 'x' Values on A read port at time %0t (is memory initialized?)", $time);
 				$finish;
 			end
 		end
