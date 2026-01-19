@@ -10,7 +10,7 @@ webtalk*.jou
 webtalk*.log
 xsim*.jou
 .Xil/*
-xsim.dir/*
+xsim.dir
 xelab.pb
 
 # pycache

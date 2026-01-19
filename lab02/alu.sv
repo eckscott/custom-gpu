@@ -14,24 +14,22 @@
 * Module: alu
 *
 * Description:
-*    This module includes a state machine that will provide a one cycle
-*    signal every time one of the buttons is pressed. This signal
-*    is used to increment or decrement a counter that is displayed on the LEDs.
-*    The top button (btnu) is used to increment the counter by 1.
-*    The bottom button (btnd) is used to decrement the counter by 1.
-*    The left button (btnl) is used to increment the counter by the value
-*    indicated on the switches (sw).
-*    The right button (btnr) is used to decrement the counter by the value
-*    indicated on the swithces (sw).
-*    The center button (btnc) is used as a synchronous reset.
+*    This module includes combinational logic for the operations of the ALU.
+*    This module takse 2 32-bit inputs (op1 and op2) each respectively
+*    representing the 2 operands for basic arithmetic logic. This module can
+*    handle bitwise AND, OR, two's complement addition, two's complement
+*    subtraction, set less than, shift right logical, shift left logical,
+*    shift right arithmetic, and XOR operation on the two operands and stores
+*    the result in the output 32-bit result register. The module also takes
+*    a 4 bit input opcode (alu_op) which determines which operation to perform
 *
 ****************************************************************************/
 
 module alu(
-        input logic [31:0] op1, op2,    // Operands 1 and 2
-        input logic [3:0] alu_op,       // alu_op code (indicates which op)
-        output logic zero,              // Indicates when ALU result is 0
-        output logic [31:0] result      // ALU Result
+        input logic [31:0] op1, op2, 
+        input logic [3:0] alu_op,       
+        output logic zero,         
+        output logic [31:0] result
     );
 
     always_comb begin
@@ -58,6 +56,8 @@ module alu(
                 result = $signed(op1) + $signed(op2);
         endcase
     end
+
+    assign zero = (result == 0);
 
     
 
