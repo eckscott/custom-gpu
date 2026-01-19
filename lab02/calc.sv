@@ -13,8 +13,15 @@
 * Date: 19 January 2026
 * Module: calc
 *
-* Description:
-*    
+* Description: This calculator module instances the alu module,
+*              synchronizer module, and oneshot module to create a calculator
+*              using the alu operations. It takes a previously stored value
+*              (accum) that came from the previous alu result, and performs
+*              an operation with another operand inputted by the user on the
+*              switches (sw) which then displays the resulting values via the
+*              leds. The operation is decided by certain combination of button
+*              presses from btnl, btnc, and btnr. Btnd updates the value of
+*              the leds, and btnu resets everything back to zero. 
 *
 ****************************************************************************/
 
