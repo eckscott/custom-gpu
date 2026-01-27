@@ -11,8 +11,13 @@
 * Date: 24 January 2026
 * Module: regfile
 *
-* Description:
-*    
+* Description: This module creates a regfile like the one in the RISC-V
+*   processor. The register file contains 32 registers (x0 - x31) each
+*   being 32-bits wide. The operations in this module handle the writing
+*   of data (writeData) to specific registers (writeReg) when the write signal
+*   is high (write). It also handles the reading of data (readData1, readData2)
+*   from specific registers (readReg1, readReg2). It is configured to be write
+*   first design, and always maints the value of 0 in x0.
 *
 ****************************************************************************/
 
