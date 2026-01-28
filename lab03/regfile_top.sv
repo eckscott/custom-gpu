@@ -107,8 +107,8 @@ module regfile_top(
     // Mux to load readData to leds
     always_comb
         if (btnd)
-            led = readData1[31:16];
+            led = op1[31:16];
         else
-            led = readData1[15:0];
+            led = op1[15:0];
 
 endmodule
