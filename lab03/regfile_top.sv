@@ -11,7 +11,15 @@
 * Date: 27 January 2026
 * Modules: regfile_top, regfile, alu, synchronizer, oneshot
 *
-* Description: 
+* Description: This module connects the regfile and the alu modules, creating
+*   a simple dataflow circuit similar to the RISC-V datapath circuit. The
+*   circuit stores values in the register file by asserting the write signal
+*   (btnc) and performs ALU operations on the values stored in the ALU like
+*   the RISC-V processor. The register address is set using the values of the
+*   lower 15 switches (sw) when (btnl) is asserted. The outputting result of
+*   the alu operations is shown on (led), and the upper or lower bits are
+*   shown depending on the press of (btnd). (btnu) is treated as the global
+*   reset.
 *
 ****************************************************************************/
 
@@ -43,8 +51,7 @@ module regfile_top(
     *  by a MUX with switch 16 being the select bit. It either loads a sign
     *  extended 32-bit form of the lower 15 switches or the result from the
     *  alu module. The outputting readData signals are loaded into op1 and op2
-    *  for the alu module.
-    */
+    *  for the alu module */
 
 
     // Instance the synchronizer for btnc
@@ -90,8 +97,8 @@ module regfile_top(
     /* In this block, the alu module is instantiated and connected to the
     *  regfile, where the data read from the regfile is loaded into op1 and
     *  op2. The alu operation is determiend by the lower 4 switches to get
-    *  the respective alu_op code. 
-    */
+    *  the respective alu_op code. */
+
 
     // Instantiate the alu as described above
     alu alu(.op1(op1), .op2(op2), .alu_op(sw[3:0]), .zero(alu_zero),
@@ -103,7 +110,5 @@ module regfile_top(
             led = readData1[31:16];
         else
             led = readData1[15:0];
-
-    
 
 endmodule
