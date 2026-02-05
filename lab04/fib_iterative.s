@@ -4,10 +4,13 @@
 # 
 # Author: Ethan Scott
 #
-# Description: 
+# Description: This script determines the fibonacci number for any input
+#   through an iterative approach. First, it checks for the edge cases,
+#   like if the input is 0, or 1, predefined fibonacci values, and if
+#   it's not those then it enters an interative loop as described below
 #
 # Functions:
-#  - fibonacci
+#  - fibonacci: performs fibonacci number of (x2) and returns result to (x2)
 #
 #########################################################################
 
@@ -19,7 +22,8 @@
 # The function needs to be in the text segment
 .text
 
-fibonacci:			# Performs fibonacci for input a0 (a0!) and returns result to a0
+fibonacci:			# Performs fibonacci for input x2 (x2!) and returns result
+                    # to x2
 
     addi x2, x2, -8   # Make room to save values on stack
     sw x8, 0(x2)     # Save caller s0 on stack
@@ -42,10 +46,10 @@ loop:
     add x5, x0, x6     # fib_2 = fib_1
     add x6, x0, x7     # fib_1 = fib
     addi x29, x29, 1   # i++
-    beq x0, x0, loop
+    beq x0, x0, loop   # loop back to start of this loop
 
 $L4:
-    add x10, x0, x7
+    add x10, x0, x7    # Set fib(input) = output (fib) from loop
     j $L1
 
 $L3:
