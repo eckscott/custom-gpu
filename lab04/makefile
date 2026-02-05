@@ -5,6 +5,9 @@
 fact_rec_78:
 	java -jar ../resources/rars1_6.jar fact_rec_78.s fact_rec.s | tee fact_rec_78.out
 
+fib_iterative:
+	java -jar ../resources/rars1_6.jar fib_main_multiple.s fib_iterative.s | tee fib_iterative.out
+
 analyze_regfile: regfile.sv tb_regfile.sv
 	xvlog -i ../include $^ -sv --nolog
 
@@ -56,3 +59,4 @@ clean:
 	rm -f *.bit *.dcp *.rpt
 	rm -f clockInfo.txt regfile_timing.rpt regfile_utilization.rpt regfile_imp*.log
 	rm -f *.log
+	rm -f *.out
