@@ -8,45 +8,8 @@ fact_rec_78:
 fib_iterative:
 	java -jar ../resources/rars1_6.jar fib_main_multiple.s fib_iterative.s | tee fib_iterative.out
 
-analyze_regfile: regfile.sv tb_regfile.sv
-	xvlog -i ../include $^ -sv --nolog
-
-elab_regfile: analyze_regfile
-	xelab regfile -debug typical -nolog
-
-elab_tb_regfile: analyze_regfile
-	xelab tb_regfile -debug typical -nolog
-
-sim_regfile_gui: elab_regfile
-	xsim regfile -gui --nolog
-
-sim_tb_regfile: elab_tb_regfile
-	xsim tb_regfile --log sim_tb_regfile.log --runall
-
-analyze_regfile_top: regfile_top.sv regfile.sv ../include/synchronizer.sv ../include/oneshot.sv tb_regfile_top.sv ../lab02/alu.sv
-	xvlog -i ../include $^ -sv --nolog
-
-elab_regfile_top: analyze_regfile_top
-	xelab regfile_top -debug typical -nolog
-
-elab_tb_regfile_top: analyze_regfile_top
-	xelab tb_regfile_top -debug typical -nolog
-
-sim_regfile_top_gui: elab_regfile_top
-	xsim regfile_top -gui --nolog
-
-sim_tb_regfile_top: elab_tb_regfile_top
-	xsim tb_regfile_top --log sim_tb_regfile_top.log --runall
-
-################################
-# Implementation
-################################
-
-regfile_top_synth.dcp: synth_regfile_top.tcl regfile_top.sv
-	vivado -mode batch -script synth_regfile_top.tcl -nojournal -log regfile_top_synth.log
-
-regfile_top.bit: regfile_top_synth.dcp
-	vivado -mode batch -script imp_regfile_top.tcl -log regfile_top_imp.log
+fib_recursive:
+	java -jar ../resources/rars1_6.jar fib_main_multiple.s fib_recursive.s | tee fib_recursive.out
 
 ################################
 # Clean
