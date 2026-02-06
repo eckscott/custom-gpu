@@ -4,10 +4,11 @@
 # 
 # Author: Ethan Scott
 #
-# Description: 
+# Description: This script determines the fibonacci number for any input
+#   through a recursive approach.
 #
 # Functions:
-#  - fibonacci
+#  - fibonacci: performs fibonacci number of (x10) and returns result to (x10)
 #
 #########################################################################
 

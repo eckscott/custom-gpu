@@ -10,7 +10,7 @@
 #   it's not those then it enters an interative loop as described below
 #
 # Functions:
-#  - fibonacci: performs fibonacci number of (x2) and returns result to (x2)
+#  - fibonacci: performs fibonacci number of (x10) and returns result to (x10)
 #
 #########################################################################
 
@@ -22,8 +22,8 @@
 # The function needs to be in the text segment
 .text
 
-fibonacci:			# Performs fibonacci for input x2 (x2!) and returns result
-                    # to x2
+fibonacci:			# Performs fibonacci for input x10 (x10!) and returns result
+                    # to x10
 
     addi x2, x2, -8   # Make room to save values on stack
     sw x8, 0(x2)     # Save caller s0 on stack
