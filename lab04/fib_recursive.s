@@ -19,47 +19,37 @@
 # The function needs to be in the text segment
 .text
 
-fibonacci:			# Performs fibonacci for input x2 (x2!) and returns result
-                    # to x2
+fibonacci:			# Performs fibonacci for input x10 (x10!) and returns result
+                    # to x10
 
-    addi x2, x2, -8   # Make room to save values on stack
-    sw x10, 0(x2)     # Save n on stack
-    sw x1, 4(x2)     # Save return address on stack
+    addi x2, x2, -12  # Make room to save values on stack
+    sw x18, 0(x2)     # save saved register
+    sw x8, 4(x2)     # Save saved register 2
+    sw x1, 8(x2)      # Save return address on stack
 
-    beq x10, x0, $L2   # n = 0
-    addi x6, x0, 1     # Set temp reg to 1 for comparison
-    beq x10, x6, $L3   # n = 1
+    add x18, x10, x0   # store argument in x18
     
     addi x5, x0, 2     # Set temp reg to 2 for comparison
-    bge x10, x5, $L1    # n >= 2
-    addi x10, x0, 0    # fib = 0
-    addi x2, x2, 8     # increment stack
-    jalr x0, 0(x1)     # Now that you've stored as many iterations as you need
-                       # you will jump to the actual fibonacci calculation
+    bge x10, x5, $L1   # n >= 2
+
+    lw x18, 0(x2)      # Load saved register 
+    lw x8, 4(x2)       # Load saved register 2
+    lw x1, 8(x2)       # Load return address back into x1
+    addi x2, x2, 12     # reset stack pointer
+    ret
 
 $L1:
-    addi x10, x10, -1  # n - 1
+    addi x10, x18, -1  # n = n - 1
     jal x1, fibonacci  # fib(n - 1)
-    addi x9, x10, 0    # x9 = n
-    lw x10, 0(x2)      # x10 = n + 1 (recovering the old n vals)
-    lw x1, 4(x2)       # pop return address
-    addi x2, x2, 8     # increment stack
-    add x10, x0, x9   # fib(n) = fib(n-1) + fib(n-2)
+    mv x8, x10       # save fib(n-1) in x8
+    addi x10, x18, -2   # n = n - 2
+    jal x1, fibonacci  # fib(n-2)
+    add x10, x10, x8   # fib = fib(n-2) + fib(n-1)
+
+    lw x18, 0(x2)      # recover OG n - 1
+    lw x8, 4(x2)      # recover saved register 2
+    lw x1, 8(x2)       # pop return address
+    addi x2, x2, 12    # increment stack
     jalr x0, 0(x1)     # return
 
-$L2:
-    lw x10, 0(x2)
-    lw x1, 4(x2)
-    addi x2, x2, 8
-
-    ret
-
-$L3:
-    lw x10, 0(x2)
-    lw x1, 4(x2)
-    addi x2, x2, 8
-
-    addi x10, x0, 1
-
-    ret
 
