@@ -32,10 +32,10 @@ add_force RegWrite 1
 run 20 ns
 
 # Perform addi x1, x0, 1
-add_force instruction -radix hex 00002b03
+add_force instruction -radix hex fe1080e3
 run 20 ns
-add_force ALUSrc 1
-add_force ALUCtrl 0010
+add_force ALUSrc 0
+add_force ALUCtrl 0110
 run 20 ns
 
 # End of simulation
