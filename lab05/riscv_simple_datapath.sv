@@ -18,42 +18,48 @@
 *
 ****************************************************************************/
 
-module riscv_simple_datapath(
+module riscv_simple_datapath #(parameter logic [31:0] INITIAL_PC = 32'h0040_0000)(
         input logic clk, rst,
         input logic [31:0] instruction, dReadData,
-        input logic PCsrc, ALUsrc, RegWrite, MemtoReg, ALUCtrl, loadPC,
+        input logic PCSrc, ALUSrc, RegWrite, MemtoReg,
+        input logic [3:0] ALUCtrl,
+        input logic loadPC,
 
         output logic [31:0] PC, dAddress, dWriteData, WriteBackData,
         output logic Zero
     );
 
-localparam INITIAL_PC = 32'h0040_0000;
-localparam PC_NORMAL_INCREMENT = 4;
+localparam PC_NORMAL_INCREMENT = 4'b0100;
 
 // 32-bit sign extended immediate values for each different operation type
 logic [31:0] immI, immS, immSB;
 
-assign immI = {IMM_I_SIGN_EXT_BITS{instruction[IMM_MSB]},
-               instruction[IMM_MSB:IMM_I_LSB]}; 
-assign immS = {IMM_S_SIGN_EXT_BITS{instruction[IMM_MSB]},
+assign immI = {{IMM_I_SIGN_EXT_BITS{instruction[IMM_MSB]}},
+                instruction[IMM_MSB:IMM_I_LSB]}; 
+assign immS = {{IMM_S_SIGN_EXT_BITS{instruction[IMM_MSB]}},
                instruction[IMM_MSB:IMM_S_LSB_1],
                instruction[IMM_S_MSB_2:IMM_S_LSB_2]};
-assign immSB = {IMM_SB_SIGN_EXT_BITS{instruction[IMM_MSB]},
+assign immSB = {{IMM_SB_SIGN_EXT_BITS{instruction[IMM_MSB]}},
                 instruction[IMM_MSB],
                 instruction[IMM_SB_BIT_11],
                 instruction[IMM_SB_BIT_10:IMM_SB_BIT_5],
                 instruction[IMM_SB_BIT_4:IMM_SB_BIT_1],
-                0};
+                1'b0};
+
+/* This block performs the combinational logic needed for adding the immediate
+*  value to the PC for branch instructions */
+logic [31:0] pc_increment;
+assign pc_increment = PCSrc ? (immSB) : (PC_NORMAL_INCREMENT);
 
 /* This block updates the PC register on the posedge of the clock and resets
 *  to INITIAL_PC when the global (rst) is asserted. The PC is updated to PC + 4
-*  when PCCsrc is 1, and updates to PC + immSB when PCsrc is 0
+*  when PCCsrc is 1, and updates to PC + immSB when PCSrc is 0
 */
 always_ff@(posedge clk) begin
     if (rst)
         PC <= INITIAL_PC;
     else if (loadPC)
-        PC <= PCsrc ? (PC + PC_NORMAL_INCREMENT) : (PC + immSB);   
+        PC <= PC + pc_increment; 
 end
 
 /**********************************
@@ -77,7 +83,7 @@ logic [31:0] reg1_data, reg2_data;
 // Instance the regfile module as described above
 regfile regfile(.clk(clk), .write(RegWrite), .readReg1(rs1),
                     .readReg2(rs2), .writeReg(rd),
-                    .writeData(dWriteData), .readData1(reg1_data),
+                    .writeData(WriteBackData), .readData1(reg1_data),
                     .readData2(reg2_data));
 
 /**********************************
@@ -86,7 +92,7 @@ regfile regfile(.clk(clk), .write(RegWrite), .readReg1(rs1),
 /* This block of code instances the ALU module as well as the needed
 *  intermediate signals. A MUX is created to decide which value to use for
 *  the second operand in ALU operations, either the data from register 2 or
-*  an immediate value, determined by the ALUsrc signal.
+*  an immediate value, determined by the ALUSrc signal.
 */
 
 // intermediate signal to store 2nd operand in ALU operations and result of
@@ -94,15 +100,15 @@ regfile regfile(.clk(clk), .write(RegWrite), .readReg1(rs1),
 logic [31:0] op2, alu_result;
 
 // MUX to determine whether op2 is loaded with the data from register 2 or
-// an immediate value, determined by (ALUsrc)
+// an immediate value, determined by (ALUSrc)
 always_comb begin
-    if (ALUsrc) begin
-        if (instruction[OPCODE_MSB:OPCODE_LSB] == OP_IMM_OPCODE)
-            op2 = immI;
-        else if (instruction[OPCODE_MSB:OPCODE_LSB] == OP_STORE_OPCODE)
+    if (ALUSrc) begin
+        if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW)
             op2 = immS;
-        else if (instruction[OPCODE_MSB:OPCODE_LSB] == OP_BRANCH_OPCODE)
+        else if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE)
             op2 = immSB;
+        else
+            op2 = immI;
     end
     else
         op2 = reg2_data;

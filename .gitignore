@@ -28,3 +28,4 @@ xelab.pb
 *.bit
 */.Xil
 *.out
+*.mem
