@@ -25,11 +25,8 @@ sim_tb_simple_datapath: elab_tb_simple_datapath
 # Implementation
 ################################
 
-riscv_simple_datapath_top_synth.dcp: synth_riscv_simple_datapath_top.tcl riscv_simple_datapath_top.sv
-	vivado -mode batch -script synth_riscv_simple_datapath_top.tcl -nojournal -log riscv_simple_datapath_top_synth.log
-
-riscv_simple_datapath_top.bit: riscv_simple_datapath_top_synth.dcp
-	vivado -mode batch -script imp_riscv_simple_datapath_top.tcl -log riscv_simple_datapath_top_imp.log
+riscv_simple_datapath_synth.dcp: synth_riscv_simple_datapath.tcl riscv_simple_datapath.sv
+	vivado -mode batch -script synth_riscv_simple_datapath.tcl -nojournal -log riscv_simple_datapath_synth.log
 
 ################################
 # Clean
