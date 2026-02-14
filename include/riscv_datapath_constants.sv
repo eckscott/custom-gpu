@@ -45,7 +45,7 @@
     // Bit lengths for padding to 32-bit immediates
     localparam IMM_I_SIGN_EXT_BITS = 20;
     localparam IMM_S_SIGN_EXT_BITS = 20;
-    localparam IMM_SB_SIGN_EXT_BITS = 19;
+    localparam IMM_SB_SIGN_EXT_BITS = 19;   
     localparam IMM_UJ_SIGN_EXT_BITS = 11;
 
     // Register addressing in instruction
