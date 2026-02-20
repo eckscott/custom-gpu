@@ -33,6 +33,10 @@ module riscv_multicycle #(parameter logic [31:0] INITIAL_PC = 32'h0040_0000)(
         output logic MemRead, MemWrite
     );
 
+// Instance the control signals that are connected back to the datapath
+logic ALUSrc, MemtoReg, PCSrc, zero, RegWrite, loadPC;
+logic [3:0] ALUCtrl;
+
 
 /**********************************
 ***    DATAPATH INSTANTIATION   ***
@@ -70,8 +74,14 @@ end
 *  current state. Here, the control signals for (RegWrite), (MemRead), 
 *  (MemWrite), and (loadPC) are set accordingly.*/
 always_comb begin
+    loadPC = 0;
+    RegWrite = 0;
+    MemRead = 0;
+    MemWrite = 0;
     case (cs)
-        IF: ns = ID;
+        IF: begin
+            ns = ID;
+        end 
         ID: ns = EXE;
         EXE: ns = MEM;
         MEM:begin
@@ -100,8 +110,6 @@ end
 /**********************************
 ***       CONTROL SIGNALS       ***
 **********************************/
-// Instance the control signals that are connected back to the datapath
-logic ALUSrc, ALUCtrl, MemtoReg, PCSrc, zero, RegWrite, loadPC;
 
 /* Set ALUSrc to 1 for instructions that require an immediate value, and 0
    for all other instructions */
@@ -120,16 +128,16 @@ always_comb begin
     else if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE)
         ALUCtrl = SUB_OP;
     else begin
-        case(instruction[FUNCT3_MSB:FUNCT3_LSB]):
-            ADD: instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE ?
-                 ALUCtrl = ADD_OP : 
-                 instruction[FUNCT7_MSB:FUNCT7_LSB] == FUNCT7_ADD ? 
-                 ALUCtrl = ADD_OP : ALUCtrl = SUB_OP;
+        case(instruction[FUNCT3_MSB:FUNCT3_LSB])
+            ADD: ALUCtrl = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE) ?
+                 ADD_OP : 
+                 (instruction[FUNCT7_MSB:FUNCT7_LSB] == FUNCT7_ADD) ? 
+                 ADD_OP : SUB_OP;
             SLL: ALUCtrl = SLL_OP;
             SLT: ALUCtrl = SLT_OP;
             XOR: ALUCtrl = XOR_OP;
-            SRL: instruction[FUNCT7_MSB:FUNCT7_LSB] == FUNCT7_SRL ?
-                 ALUCtrl = SRL_OP : ALUCtrl = SRA_OP;
+            SRL: ALUCtrl = (instruction[FUNCT7_MSB:FUNCT7_LSB] == FUNCT7_SRL) ?
+                 SRL_OP : SRA_OP;
             OR: ALUCtrl = OR_OP;
             AND: ALUCtrl = AND_OP;
             default: ALUCtrl = ADD_OP;
@@ -143,9 +151,5 @@ assign MemtoReg = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW);
 /* Assert the PCSrc signal for branch instructions where the Zero signal is
    high, indicating the beq condition is met. */
 assign PCSrc = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE) && zero;
-
-/* NEXT THINGS TO DO:
-    * - Add the FUNCT3 and FUNCT7 constants
-*/
 
 endmodule

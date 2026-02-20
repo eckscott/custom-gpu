@@ -30,6 +30,8 @@
 main:               # Label for start of program
 
     la x5, bounds_data   # Load address of bounds_data into x5
+    li x8, MAX_VALUE     # Load MAX_VALUE into x8
+    li x9, MIN_VALUE     # Load MIN_VALUE into x9 
 
 iterate_loop:
 
@@ -37,26 +39,28 @@ iterate_loop:
 
     beq x6, x0, end     # If the current element is 0, end of array reached
 
-    blt MAX_VALUE, x6, update_max  # If current element is greater than
+    blt x8, x6, update_max  # If current element is greater than
                                    # MAX_VALUE, update max count
-    blt x6, MIN_VALUE, update_min  # If current element is less than
+    blt x6, x9, update_min  # If current element is less than
                                    # MIN_VALUE, update min count
-    
+
+update_max:
+    sw x8, 0(x5)  # Store MAX_VALUE at the current element's address
+    addi a1, a1, 1     # Increment count of elements greater than MAX_VALUE
     lw x7, 0(x5)        # Load the updated element
     add a0, x7, a0      # Add the current element to the running sum of array
 
     addi x5, x5, 4      # Increment pointer to next element (4 bytes for each word)
-    jalr x0, iterate_loop  # Jump back to start of loop
-
-update_max:
-    sw MAX_VALUE, 0(x5)  # Store MAX_VALUE at the current element's address
-    addi a1, a1, 1     # Increment count of elements greater than MAX_VALUE
-    return             # Return to caller
+    j iterate_loop  # Jump back to start of loop
 
 update_min:
-    sw MIN_VALUE, 0(x5)  # Store MIN_VALUE at the current element's address
+    sw x9, 0(x5)  # Store MIN_VALUE at the current element's address
     addi a2, a2, 1     # Increment count of elements less than MIN_VALUE
-    return             # Return to caller
+    lw x7, 0(x5)        # Load the updated element
+    add a0, x7, a0      # Add the current element to the running sum of array
+
+    addi x5, x5, 4      # Increment pointer to next element (4 bytes for each word)
+    j iterate_loop  # Jump back to start of loop
 
 end:
     addi x0, a0, 0      # Instructions provided in lab write up for termination
