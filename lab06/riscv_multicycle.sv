@@ -46,9 +46,9 @@ module riscv_multicycle #(parameter logic [31:0] INITIAL_PC = 32'h0040_0000)(
 
 riscv_simple_datapath #(.INITIAL_PC(INITIAL_PC)) datapath (
     .clk(clk), .rst(rst), .instruction(instruction), .dReadData(dReadData),
-    .PCSrc(PCSrc), .ALUSrc(ALUSrc), .RegWrite(), .MemtoReg(MemtoReg), .ALUCtrl(ALUCtrl), .loadPC(),
-    .PC(PC), .dAddress(dAddress), .dWriteData(dWriteData),
-    .WriteBackData(WriteBackData), .Zero(zero)
+    .PCSrc(PCSrc), .ALUSrc(ALUSrc), .RegWrite(RegWrite), .MemtoReg(MemtoReg),
+    .ALUCtrl(ALUCtrl), .loadPC(loadPC), .PC(PC), .dAddress(dAddress),
+    .dWriteData(dWriteData), .WriteBackData(WriteBackData), .Zero(zero)
 );
 
 /**********************************
@@ -56,14 +56,6 @@ riscv_simple_datapath #(.INITIAL_PC(INITIAL_PC)) datapath (
 **********************************/
 // Current state and next state variables for control signal SM
 logic [2:0] cs, ns;
-
-// ***** IMPORTANT ***** MOVE TO CONSTANTS FILE
-localparam IF = 3'b000,
-           ID = 3'b001,
-           EXE = 3'b010,
-           MEM = 3'b011,
-           WB = 3'b100;
-
 
 /* This always_ff block handles the synchronouse state transitions for the
 * control signals. Each state is 1 clock cycle long. */
@@ -109,8 +101,7 @@ end
 ***       CONTROL SIGNALS       ***
 **********************************/
 // Instance the control signals that are connected back to the datapath
-logic ALUSrc, ALUCtrl, MemtoReg, PCSrc, zero, RegWrite, MemRead, MemWrite;
-logic loadPC;
+logic ALUSrc, ALUCtrl, MemtoReg, PCSrc, zero, RegWrite, loadPC;
 
 /* Set ALUSrc to 1 for instructions that require an immediate value, and 0
    for all other instructions */
@@ -155,7 +146,6 @@ assign PCSrc = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE) && zero;
 
 /* NEXT THINGS TO DO:
     * - Add the FUNCT3 and FUNCT7 constants
-    * - Add state constants to constants file
 */
 
 endmodule

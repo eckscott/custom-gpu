@@ -56,4 +56,30 @@
     localparam RD_MSB = 11;
     localparam RD_LSB = 7;
 
+    // States for the control signal state machine
+    localparam IF = 3'b000,
+               ID = 3'b001,
+               EXE = 3'b010,
+               MEM = 3'b011,
+               WB = 3'b100;
+
+    // Register addressing for funct3 and funct7
+    localparam FUNCT3_MSB = 14;
+    localparam FUNCT3_LSB = 12;
+    localparam FUNCT7_MSB = 31;
+    localparam FUNCT7_LSB = 25;
+
+    // Different FUNCT3 codes
+    localparam ADD = 3'b000;
+    localparam SLL = 3'b001;
+    localparam SLT = 3'b010;
+    localparam XOR = 3'b100;
+    localparam SRL = 3'b101;
+    localparam OR = 3'b110;
+    localparam AND = 3'b111;
+
+    // Different FUNCT7 codes
+    localparam FUNCT7_ADD = 7'b0000000;
+    localparam FUNCT7_SRL = 7'b0000000;
+
 `endif
