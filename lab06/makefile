@@ -31,15 +31,15 @@ analyze_tb_bounds: assemble_bounds ../include/riscv_memory.sv ../lab05/riscv_sim
 elab_tb_bounds: analyze_tb_bounds
 	xelab tb_multicycle -debug typical -nolog -timescale 1ns/100ps -generic "instruction_memory_filename=bounds_text.mem" -generic "data_memory_filename=bounds_data.mem" -s tb_multicycle_bounds
 
-sim_tb_bounds: elab_tb_bounds
+sim_tb_multicycle_bounds: elab_tb_bounds
 	xsim tb_multicycle_bounds --log sim_tb_multicycle_bounds.log --runall
 
 ################################
 # Implementation
 ################################
 
-riscv_simple_datapath_synth.dcp: synth_riscv_simple_datapath.tcl riscv_simple_datapath.sv
-	vivado -mode batch -script synth_riscv_simple_datapath.tcl -nojournal -log riscv_simple_datapath_synth.log
+riscv_multicycle_synth.dcp: synth_riscv_multicycle.tcl riscv_multicycle.sv
+	vivado -mode batch -script synth_riscv_multicycle.tcl -nojournal -log riscv_multicycle_synth.log
 
 ################################
 # Clean
@@ -49,6 +49,6 @@ clean:
 	rm -rf xsim.dir .Xil tb_multicycle.wdb xsim*.jou xelab.pb xvlog.log xvlog.pb vivado*.str vivado*.jou
 	rm -f sim_tb_multicycle*.log *.wdb
 	rm -f sim_tb_multicycle_bounds*.log
-	rm -f riscv_simple_datapath_synth.dcp riscv_simple_datapath_synth*.log
+	rm -f riscv_multicycle_synth.dcp riscv_multicycle_synth*.log
 	rm -f *.bit *.dcp *.rpt
 	rm -f *.log, *.mem
