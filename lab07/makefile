@@ -17,7 +17,7 @@ include ../resources/iosystem/iosystem.mk
 # Clean
 ################################
 
-clean: clean-iosystem
+clean: clean_iosystem
 	rm -rf xsim.dir .Xil tb_multicycle.wdb xsim*.jou xelab.pb xvlog.log xvlog.pb vivado*.str vivado*.jou
 	rm -f sim_tb_multicycle*.log *.wdb
 	rm -f sim_tb_multicycle_bounds*.log
