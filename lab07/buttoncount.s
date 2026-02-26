@@ -42,7 +42,7 @@
 #
 #########################################################################
 
-.globl  main
+.globl  start
 
 .data
 	.word 0
@@ -64,7 +64,7 @@
 	.eqv BUTTON_R_MASK 0x08
 	.eqv BUTTON_U_MASK 0x10
 
-main:
+start:
 	# Prepare I/O base address
 	addi x3, x0, 0x7f
 	# Shift left 8
