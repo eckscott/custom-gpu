@@ -23,4 +23,4 @@ clean: clean_iosystem
 	rm -f sim_tb_multicycle_bounds*.log
 	rm -f riscv_multicycle_synth.dcp riscv_multicycle_synth*.log
 	rm -f *.bit *.dcp *.rpt
-	rm -f *.log, *.mem
+	rm -f *.log, *.mem, *.txt
