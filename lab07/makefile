@@ -37,3 +37,4 @@ clean: clean_iosystem
 	rm -f buttoncount_text.mem
 	rm -f xelab.log
 	rm -f multicycle_buttoncount.log
+	rm -f *.wdb
