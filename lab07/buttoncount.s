@@ -42,7 +42,7 @@
 #
 #########################################################################
 
-.globl  start
+.globl  main
 
 .data
 	.word 0
@@ -64,7 +64,7 @@
 	.eqv BUTTON_R_MASK 0x08
 	.eqv BUTTON_U_MASK 0x10
 
-start:
+main:
 	# Prepare I/O base address
 	addi x3, x0, 0x7f
 	# Shift left 8
@@ -75,12 +75,13 @@ start:
 	sw x0, SEVENSEG_OFFSET(x3)          # Clear seven segment display
 	sw x0, TIMER(x3)                    # Clear timer to zero
 
+    # Set count to 0
+    addi x18, x0, 0
+
 LOOP_START:
 
     # Load the buttons
     lw x8, BUTTON_OFFSET(x3)
-    # Set count to 0
-    addi x18, x0, 0
 
 UPDATE_SEVEN_SEG:
     lw x5, TIMER(x3)                # Load timer
