@@ -12,7 +12,7 @@
 * Author: Ethan Scott
 * Class: ECEN 423, Sec 01, Winter 2026
 * Date: 03 March 2026
-* Modules: 
+* Modules: regfile.sv, alu.sv
 * Description:
 * 
 ****************************************************************************/
@@ -30,7 +30,7 @@ localparam PC_NORMAL_INCREMENT = 4'b0100;
 /* This block performs the combinational logic needed for adding the immediate
 *  value to the PC for branch instructions */
 logic [31:0] if_pc_inc;
-assign if_pc_inc = wb_PCSrc ? (wb_immSB) : (PC_NORMAL_INCREMENT);
+assign if_pc_inc = wb_PCSrc ? (wb_branch_addr) : (PC_NORMAL_INCREMENT);
 
 
 //////////////////////////////////////////////////////////////////////
@@ -208,10 +208,20 @@ assign ex_writeReg = instruction[RD_MSB:RD_LSB];
 /* Instance the register file. The 2 readAddresses (readReg1 & readReg2)
 *  are determined by the instruction decoding. The Write signals are
 *  Piplined down and the WB signals are connected back to this module */
-regfile rf(.clk(clk), .write(/*wb_RegWrite*/), .readReg1(id_rs1),
-           .readReg2(id_rs2), .writeReg(/*wb_writeReg*/),
-           .writeData(/*wb_writeData*/), .readData1(ex_read1),
+regfile rf(.clk(clk), .write(wb_RegWrite), .readReg1(id_rs1),
+           .readReg2(id_rs2), .writeReg(wb_writeReg),
+           .writeData(wb_writeData), .readData1(ex_read1),
            .readData2(ex_read2));
+
+// writeReg pipeline signal
+logic [4:0] mem_writeReg;
+// Pipeline writeReg
+always_ff @(posedge clk)begin
+    if (rst)
+        mem_writeReg <= 0;
+    else
+        mem_writeReg <= ex_writeReg;
+end
 
 
 //////////////////////////////////////////////////////////////////////
@@ -311,5 +321,83 @@ always_ff @(posedge clk) begin
     end
 end
 
+
+//////////////////////////////////////////////////////////////////////
+// MEM: Memory Access
+//////////////////////////////////////////////////////////////////////
+
+
+/**********************************
+***         Data Memory         ***
+**********************************/
+
+assign dAddress = mem_alu_result;           /* Note sure if this is right check this */
+assign MemRead = mem_MemRead;   
+assign MemWrite = mem_MemWrite;
+
+/**********************************
+***         Branch Logic        ***
+**********************************/
+
+// PC pipelined to the wb stage
+logic [31:0] wb_PC;
+// PCSrc control signal used to determine how the PC is incremented
+logic mem_PCSrc;
+//
+assign mem_PCSrc = mem_Branch & mem_Zero;
+
+// Pipeline the branch logic signal and PC to next stage
+always_ff @(posedge clk) begin
+    if (rst) begin
+        wb_PCSrc <= 1'b0;
+        wb_PC <= INITIAL_PC;
+    end
+    else begin
+        wb_PCSrc <= mem_PCSrc;
+        wb_PC <= mem_PC;
+    end
+end
+
+/**********************************
+***    Pipelining EX signals    ***
+**********************************/
+
+// signals for pipelining
+logic [31:0] wb_alu_result, wb_branch_addr;
+logic wb_MemtoReg, wb_RegWrite, wb_writeReg
+// Pipeline signals to be used in the wb stage
+always_ff @(posedge clk) begin
+    if (rst) begin
+        wb_alu_result <= 0;
+        wb_MemtoReg <= 1'b0;
+        wb_RegWrite <= 1'b0;
+        wb_writeReg <= 1'b0;
+        wb_branch_addr <= 0;
+    end
+    else begin
+        wb_alu_result <= mem_alu_result;
+        wb_MemtoReg <= mem_MemtoReg;
+        wb_RegWrite <= mem_RegWrite;
+        wb_writeReg <= mem_writeReg;
+        wb_branch_addr <= mem_branch_addr;
+    end
+end
+
+
+//////////////////////////////////////////////////////////////////////
+// WB: Write Back
+//////////////////////////////////////////////////////////////////////
+
+
+// write back data
+logic [31:0] wb_writeData;
+// Assign writeBackData to be MemRead value if MemtoReg is high
+assign wb_writeData = MemtoReg ? mem_MemRead : mem_alu_result;
+
+// Assign top level ports
+assign WriteBackData = wb_writeData;
+assign dWriteData = mem_writeData;
+assign ALUResult = ex_ALUResult;
+assign PC = if_PC;
 
 endmodule
