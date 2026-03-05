@@ -13,7 +13,8 @@ module multicycle_iosystem #(
     TEXT_MEM = "",
     DATA_MEM = "",
     USE_DEBOUNCER = 1,
-    TIMER_CLOCK_REDUCTION = 1
+    TIMER_CLOCK_REDUCTION = 1,
+    DEBOUNCE_DELAY_US = 10
 ) (
     // Top-level ports
     input logic clk,
@@ -46,7 +47,6 @@ module multicycle_iosystem #(
     localparam IO_START_ADDRESS = 32'h00007f00;
     localparam VGA_START_ADDRESS = 32'h00008000;
     localparam PROC_CLOCK_RATE = INPUT_CLOCK_RATE / PROC_CLK_DIVIDE;
-    localparam DEBOUNCE_DELAY_US = 1;
     
     // Module Signals
     logic clk_proc, clk_vga, rst;
