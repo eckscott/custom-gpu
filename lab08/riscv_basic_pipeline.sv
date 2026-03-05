@@ -1,0 +1,315 @@
+// This timescale statement indicates that each time tick of the simulator
+// is 1 nanosecond and the simulator has a precision of 100 picoseconds
+`timescale 1 ns / 100 ps 
+// Header files containing all of the alu_op codes declared as constants
+// and the opcode values and bit slicing values for the RISC-V datapath
+`include "riscv_alu_constants.sv"
+`include "riscv_datapath_constants.sv"
+/***************************************************************************
+*
+* File: riscv_basic_pipeline.sv
+*
+* Author: Ethan Scott
+* Class: ECEN 423, Sec 01, Winter 2026
+* Date: 03 March 2026
+* Modules: 
+* Description:
+* 
+****************************************************************************/
+
+module riscv_basic_pipeline #(parameter logic [31:0] INITIAL_PC = 32'h0000_3000)(
+    input logic clk, rst,
+    input logic [31:0] instruction, dReadData
+    output logic [31:0] PC, ALUResult, dAddress, dWriteData, WriteBackData
+    output logic MemRead, MemWrite
+);
+
+localparam PC_NORMAL_INCREMENT = 4'b0100;
+
+
+/* This block performs the combinational logic needed for adding the immediate
+*  value to the PC for branch instructions */
+logic [31:0] if_pc_inc;
+assign if_pc_inc = wb_PCSrc ? (wb_immSB) : (PC_NORMAL_INCREMENT);
+
+
+//////////////////////////////////////////////////////////////////////
+// IF: Instruction Fetch
+//////////////////////////////////////////////////////////////////////
+
+
+// PC signals used for instruction fetch and instruction decode stages
+logic [31:0] if_PC, id_PC;
+
+/* This block increments the program counter in the instruction fetch register.
+*  It resets to the INITIAL_PC value on assertion of the global rst signal,
+*  and increments based on the calculated if_pc_inc as described above */
+always_ff @(posedge clk) begin
+    if (rst)
+        if_PC <= INITIAL_PC;
+    else 
+        if_PC <= if_pc_inc;
+end
+
+/* This block passes the PC from the instruction fetch stage to the instruction
+*  decode stage on the clock cycle */
+always_ff @(posedge clk) begin
+    if (rst)
+        id_PC <= INITIAL_PC;
+    else
+        id_PC <= if_PC;
+end
+
+
+//////////////////////////////////////////////////////////////////////
+// ID: Instruction Decode
+//////////////////////////////////////////////////////////////////////
+
+
+/**********************************
+***       CONTROL SIGNALS       ***
+**********************************/
+/* the control signals that are decoded from the instruction in this stage
+*  as well as the pipeline registers used to pass it on to the next stage */
+logic [3:0] id_ALUCtrl, ex_ALUCtrl
+logic id_ALUSrc, ex_ALUSrc, id_MemWrite, ex_MemWrite, id_MemRead, ex_MemRead, id_Branch,
+      ex_Branch, id_RegWrite, ex_RegWrite, id_MemtoReg, ex_MemtoReg
+
+/* Combinational logic to determine the id_ALUCtrl signal based on the instruction
+*  opcode and funct3 and funct7 fields. In this module, the id_ALUCtrl signal is
+*  set to ADD_OP for lw an sw instructions, and set to SUB_OP for branch
+*  instructions */
+always_comb begin
+    if ((instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW) || 
+        (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW))
+        id_ALUCtrl = ADD_OP;
+    else if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE)
+        id_ALUCtrl = SUB_OP;
+    else begin
+        case(instruction[FUNCT3_MSB:FUNCT3_LSB])
+            ADD: id_ALUCtrl = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE) ?
+                 ADD_OP : 
+                 (instruction[FUNCT7_MSB:FUNCT7_LSB] == FUNCT7_ADD) ? 
+                 ADD_OP : SUB_OP;
+            SLL: id_ALUCtrl = SLL_OP;
+            SLT: id_ALUCtrl = SLT_OP;
+            XOR: id_ALUCtrl = XOR_OP;
+            SRL: id_ALUCtrl = (instruction[FUNCT7_MSB:FUNCT7_LSB] == FUNCT7_SRL) ?
+                 SRL_OP : SRA_OP;
+            OR: id_ALUCtrl = OR_OP;
+            AND: id_ALUCtrl = AND_OP;
+            default: id_ALUCtrl = ADD_OP;
+        endcase
+    end       
+end
+
+/* Set id_ALUSrc to 1 for instructions that require an immediate value, and 0
+   for all other instructions */
+assign id_ALUSrc = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE) ||
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW) ||
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW);
+
+/* Combinational logic blocks to assign id_MemRead and id_MemWrite signals depending
+*  on if the instruction is a lw or a sw */
+assign id_MemWrite = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW);
+assign id_MemRead = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW);
+
+/* Combinational logic block to determine whether the instruction is a branch
+*  or not */
+assign id_Branch = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE);
+
+/* Combinational logic for id_RegWrite Ctrl Signal which is only asserted for
+*  R_type, I_type, or lw instructions */
+assign id_RegWrite = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_R_TYPE) ||
+                     (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE) ||
+                     (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW);
+
+// Assert the id_MemtoReg signal for lw instructions, and deassert for all other
+assign id_MemtoReg = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW);
+
+// ID Pipeline register passing information for ctrl signals down the pipeline
+always_ff @(posedge clk) begin
+    if (rst) begin
+        ex_ALUCtrl <= 4'b0000;
+        ex_ALUSrc <= 1'b0;
+        ex_MemWrite <= 1'b0;
+        ex_MemRead <= 1'b0;
+        ex_Branch <= 1'b0;
+        ex_RegWrite <= 1'b0;
+        ex_MemtoReg <= 1'b0;
+    end
+    else begin
+        ex_ALUCtrl <= id_ALUCtrl;
+        ex_ALUSrc <= id_ALUSrc;
+        ex_MemWrite <= id_MemWrite;
+        ex_MemRead <= id_MemRead;
+        ex_Branch <= id_Branch;
+        ex_RegWrite <= id_RegWrite;
+        ex_MemtoReg <= id_MemtoReg;
+    end
+end
+
+/**********************************
+***      IMMEDIATE VALUES       ***
+**********************************/
+// 32-bit sign extended immediate values for each different operation type
+logic [31:0] id_immI, ex_immI, id_immS, ex_immS, id_immSB, ex_immSB;
+
+/* Combinational logic blocks to decode the immediate values for the the 3
+*  different instruction types*/
+assign id_immI = {{IMM_I_SIGN_EXT_BITS{instruction[IMM_MSB]}},
+                instruction[IMM_MSB:IMM_I_LSB]}; 
+assign id_immS = {{IMM_S_SIGN_EXT_BITS{instruction[IMM_MSB]}},
+               instruction[IMM_MSB:IMM_S_LSB_1],
+               instruction[IMM_S_MSB_2:IMM_S_LSB_2]};
+assign id_immSB = {{IMM_SB_SIGN_EXT_BITS{instruction[IMM_MSB]}},
+                instruction[IMM_MSB],
+                instruction[IMM_SB_BIT_11],
+                instruction[IMM_SB_BIT_10:IMM_SB_BIT_5],
+                instruction[IMM_SB_BIT_4:IMM_SB_BIT_1],
+                1'b0};
+
+// ID Pipeline register passing information for immediate vals down pipeline
+always_ff @(posedge clk) begin
+    if (rst) begin
+        ex_immI <= 0;
+        ex_immS <= 0;
+        ex_immSB <= 0;
+    end
+    else begin
+        ex_immI <= id_immI;
+        ex_immS <= id_immS;
+        ex_immSB <= id_immSB;
+    end
+end
+
+// ex_PC signal
+logic [31:0] ex_PC;
+
+// Pipeline PC register
+always_ff @(posedge clk)
+    if (rst)
+        ex_PC <= INITIAL_PC;
+    else
+        ex_PC <= id_PC;
+
+/**********************************
+***        REGISTER FILE        ***
+**********************************/
+
+// intermediate signals needed to connect to regfile as described below
+logic [4:0] id_rs1, id_rs2, ex_writeReg;
+
+// decoding the instruction to determine rs1, rs2, and rd
+assign id_rs2 = instruction[RS_2_MSB:RS_2_LSB];
+assign id_rs1 = instruction[RS_1_MSB:RS_1_LSB];
+assign ex_writeReg = instruction[RD_MSB:RD_LSB];
+
+/* Instance the register file. The 2 readAddresses (readReg1 & readReg2)
+*  are determined by the instruction decoding. The Write signals are
+*  Piplined down and the WB signals are connected back to this module */
+regfile rf(.clk(clk), .write(/*wb_RegWrite*/), .readReg1(id_rs1),
+           .readReg2(id_rs2), .writeReg(/*wb_writeReg*/),
+           .writeData(/*wb_writeData*/), .readData1(ex_read1),
+           .readData2(ex_read2));
+
+
+//////////////////////////////////////////////////////////////////////
+// EX: Execute
+//////////////////////////////////////////////////////////////////////
+
+
+/**********************************
+***        ALU OPERATIONS       ***
+**********************************/
+
+// Second operand for ALU operations and result
+logic [31:0] ex_op2, ex_alu_result;
+// zero signal for alu output
+logic ex_Zero;
+
+// MUX to determine whether ex_op2 is loaded with the data from register 2 or
+// an immediate value, determined by (ALUSrc)
+always_comb begin
+    if (ex_ALUSrc) begin
+        if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW)
+            ex_op2 = ex_immS;
+        else if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE)
+            ex_op2 = ex_immSB;
+        else
+            ex_op2 = ex_immI;
+    end
+    else
+        ex_op2 = ex_read2;
+end
+
+// Instantiate the ALU module as described above. Further details on the
+// function of each signal can be found in the alu.sv file
+alu alu(.op1(ex_read1), .ex_op2(ex_op2), .alu_op(ex_ALUCtrl), .zero(ex_Zero),
+        .result(ex_alu_result));
+
+// Pipeline registers for alu_result and Zero
+logic [31:0] mem_alu_result;
+logic mem_Zero;
+
+// Pipeline ALU output and Zero signal
+always_ff @(posedge clk) begin
+    if (rst) begin
+        mem_Zero <= 0;
+        mem_alu_result <= 0;
+    end
+    else begin
+        mem_Zero <= ex_Zero;
+        mem_alu_result <= ex_alu_result;
+    end
+end
+
+/**********************************
+***      Branch Target Addr     ***
+**********************************/
+
+// branch target addr signal and pipeline PC signal
+logic [31:0] ex_branch_addr, mem_branch_addr, mem_PC;
+
+// calculate branch target address
+assign ex_branch_addr = ex_PC + ex_immSB;
+
+// Pipeline PC and branch addr calculated
+always_ff @(posedge clk) begin
+    if (rst) begin
+        mem_branch_addr <= 0;
+        mem_PC <= INITIAL_PC;
+    end
+    else begin
+        mem_branch_addr <= ex_branch_addr;
+        mem_PC <= ex_PC;
+    end
+end
+
+/**********************************
+***    Pipelining ID signals    ***
+**********************************/
+
+// Pipeline ctrl signals for mem stage
+logic mem_Branch, mem_MemWrite, mem_MemRead, mem_MemtoReg, mem_RegWrite;
+
+// Pipeline necessary signals generated in ID for further stages
+always_ff @(posedge clk) begin
+    if (rst) begin
+        mem_Branch <= 0;
+        mem_MemWrite <= 0;
+        mem_MemRead <= 0;
+        mem_MemtoReg <= 0;
+        mem_RegWrite <= 0;
+    end
+    else begin
+        mem_Branch <= ex_Branch;
+        mem_MemWrite <= ex_MemWrite;
+        mem_MemRead <= ex_MemRead;
+        mem_MemtoReg <= ex_MemtoReg;
+        mem_RegWrite <= ex_RegWrite;
+    end
+end
+
+
+endmodule
