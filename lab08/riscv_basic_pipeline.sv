@@ -19,13 +19,48 @@
 
 module riscv_basic_pipeline #(parameter logic [31:0] INITIAL_PC = 32'h0000_3000)(
     input logic clk, rst,
-    input logic [31:0] instruction, dReadData
-    output logic [31:0] PC, ALUResult, dAddress, dWriteData, WriteBackData
+    input logic [31:0] instruction, dReadData,
+    output logic [31:0] PC, ALUResult, dAddress, dWriteData, WriteBackData,
     output logic MemRead, MemWrite
 );
 
 localparam PC_NORMAL_INCREMENT = 4'b0100;
 
+// PC signals used for instruction fetch and instruction decode stages
+logic [31:0] if_PC, id_PC;
+/* the control signals that are decoded from the instruction in this stage
+*  as well as the pipeline registers used to pass it on to the next stage */
+logic [3:0] id_ALUCtrl, ex_ALUCtrl;
+logic id_ALUSrc, ex_ALUSrc, id_MemWrite, ex_MemWrite, id_MemRead, ex_MemRead, id_Branch,
+      ex_Branch, id_RegWrite, ex_RegWrite, id_MemtoReg, ex_MemtoReg;
+// 32-bit sign extended immediate values for each different operation type
+logic [31:0] id_immI, ex_immI, id_immS, ex_immS, id_immSB, ex_immSB;
+// ex_PC signal
+logic [31:0] ex_PC;
+// intermediate signals needed to connect to regfile as described below
+logic [4:0] id_rs1, id_rs2, ex_writeReg, id_writeReg;
+// writeReg pipeline signal
+logic [4:0] mem_writeReg, wb_writeReg;
+// Second operand for ALU operations and result
+logic [31:0] ex_read1, ex_read2, ex_op2, ex_alu_result;
+// zero signal for alu output
+logic ex_Zero;
+// Pipeline registers for alu_result and Zero
+logic [31:0] mem_alu_result;
+logic mem_Zero;
+// Pipeline ctrl signals for mem stage
+logic mem_Branch, mem_MemWrite, mem_MemRead, mem_MemtoReg, mem_RegWrite;
+// branch target addr signal and pipeline PC signal
+logic [31:0] ex_branch_addr, mem_branch_addr, mem_PC;
+// PC pipelined to the wb stage
+logic [31:0] wb_PC;
+// PCSrc control signal used to determine how the PC is incremented
+logic mem_PCSrc, wb_PCSrc;
+// signals for pipelining
+logic [31:0] wb_alu_result, wb_branch_addr;
+logic wb_MemtoReg, wb_RegWrite;
+// write back data
+logic [31:0] wb_writeData, mem_read2, wb_read2;
 
 /* This block performs the combinational logic needed for adding the immediate
 *  value to the PC for branch instructions */
@@ -38,9 +73,6 @@ assign if_pc_inc = wb_PCSrc ? (wb_branch_addr) : (PC_NORMAL_INCREMENT);
 //////////////////////////////////////////////////////////////////////
 
 
-// PC signals used for instruction fetch and instruction decode stages
-logic [31:0] if_PC, id_PC;
-
 /* This block increments the program counter in the instruction fetch register.
 *  It resets to the INITIAL_PC value on assertion of the global rst signal,
 *  and increments based on the calculated if_pc_inc as described above */
@@ -48,7 +80,7 @@ always_ff @(posedge clk) begin
     if (rst)
         if_PC <= INITIAL_PC;
     else 
-        if_PC <= if_pc_inc;
+        if_PC <= if_PC + if_pc_inc;
 end
 
 /* This block passes the PC from the instruction fetch stage to the instruction
@@ -69,11 +101,6 @@ end
 /**********************************
 ***       CONTROL SIGNALS       ***
 **********************************/
-/* the control signals that are decoded from the instruction in this stage
-*  as well as the pipeline registers used to pass it on to the next stage */
-logic [3:0] id_ALUCtrl, ex_ALUCtrl
-logic id_ALUSrc, ex_ALUSrc, id_MemWrite, ex_MemWrite, id_MemRead, ex_MemRead, id_Branch,
-      ex_Branch, id_RegWrite, ex_RegWrite, id_MemtoReg, ex_MemtoReg
 
 /* Combinational logic to determine the id_ALUCtrl signal based on the instruction
 *  opcode and funct3 and funct7 fields. In this module, the id_ALUCtrl signal is
@@ -152,8 +179,6 @@ end
 /**********************************
 ***      IMMEDIATE VALUES       ***
 **********************************/
-// 32-bit sign extended immediate values for each different operation type
-logic [31:0] id_immI, ex_immI, id_immS, ex_immS, id_immSB, ex_immSB;
 
 /* Combinational logic blocks to decode the immediate values for the the 3
 *  different instruction types*/
@@ -183,9 +208,6 @@ always_ff @(posedge clk) begin
     end
 end
 
-// ex_PC signal
-logic [31:0] ex_PC;
-
 // Pipeline PC register
 always_ff @(posedge clk)
     if (rst)
@@ -197,24 +219,27 @@ always_ff @(posedge clk)
 ***        REGISTER FILE        ***
 **********************************/
 
-// intermediate signals needed to connect to regfile as described below
-logic [4:0] id_rs1, id_rs2, ex_writeReg;
-
 // decoding the instruction to determine rs1, rs2, and rd
 assign id_rs2 = instruction[RS_2_MSB:RS_2_LSB];
 assign id_rs1 = instruction[RS_1_MSB:RS_1_LSB];
-assign ex_writeReg = instruction[RD_MSB:RD_LSB];
+assign id_writeReg = instruction[RD_MSB:RD_LSB];
 
 /* Instance the register file. The 2 readAddresses (readReg1 & readReg2)
 *  are determined by the instruction decoding. The Write signals are
 *  Piplined down and the WB signals are connected back to this module */
 regfile rf(.clk(clk), .write(wb_RegWrite), .readReg1(id_rs1),
            .readReg2(id_rs2), .writeReg(wb_writeReg),
-           .writeData(wb_writeData), .readData1(ex_read1),
+           .writeData(WriteBackData), .readData1(ex_read1),
            .readData2(ex_read2));
 
-// writeReg pipeline signal
-logic [4:0] mem_writeReg;
+// Pipeline writeReg
+always_ff @(posedge clk)begin
+    if (rst)
+        ex_writeReg <= 0;
+    else
+        ex_writeReg <= id_writeReg;
+end
+
 // Pipeline writeReg
 always_ff @(posedge clk)begin
     if (rst)
@@ -233,11 +258,6 @@ end
 ***        ALU OPERATIONS       ***
 **********************************/
 
-// Second operand for ALU operations and result
-logic [31:0] ex_op2, ex_alu_result;
-// zero signal for alu output
-logic ex_Zero;
-
 // MUX to determine whether ex_op2 is loaded with the data from register 2 or
 // an immediate value, determined by (ALUSrc)
 always_comb begin
@@ -250,36 +270,31 @@ always_comb begin
             ex_op2 = ex_immI;
     end
     else
-        ex_op2 = ex_read2;
+        ex_op2 = ex_read2; // ex_op2 = id_ReadData2 ??
 end
 
 // Instantiate the ALU module as described above. Further details on the
 // function of each signal can be found in the alu.sv file
-alu alu(.op1(ex_read1), .ex_op2(ex_op2), .alu_op(ex_ALUCtrl), .zero(ex_Zero),
+alu alu(.op1(ex_read1), .op2(ex_op2), .alu_op(ex_ALUCtrl), .zero(ex_Zero),
         .result(ex_alu_result));
-
-// Pipeline registers for alu_result and Zero
-logic [31:0] mem_alu_result;
-logic mem_Zero;
 
 // Pipeline ALU output and Zero signal
 always_ff @(posedge clk) begin
     if (rst) begin
         mem_Zero <= 0;
         mem_alu_result <= 0;
+        mem_read2 <= 0;
     end
     else begin
         mem_Zero <= ex_Zero;
         mem_alu_result <= ex_alu_result;
+        mem_read2 <= ex_read2;
     end
 end
 
 /**********************************
 ***      Branch Target Addr     ***
 **********************************/
-
-// branch target addr signal and pipeline PC signal
-logic [31:0] ex_branch_addr, mem_branch_addr, mem_PC;
 
 // calculate branch target address
 assign ex_branch_addr = ex_PC + ex_immSB;
@@ -299,9 +314,6 @@ end
 /**********************************
 ***    Pipelining ID signals    ***
 **********************************/
-
-// Pipeline ctrl signals for mem stage
-logic mem_Branch, mem_MemWrite, mem_MemRead, mem_MemtoReg, mem_RegWrite;
 
 // Pipeline necessary signals generated in ID for further stages
 always_ff @(posedge clk) begin
@@ -339,11 +351,7 @@ assign MemWrite = mem_MemWrite;
 ***         Branch Logic        ***
 **********************************/
 
-// PC pipelined to the wb stage
-logic [31:0] wb_PC;
-// PCSrc control signal used to determine how the PC is incremented
-logic mem_PCSrc;
-//
+// Set PCSrc to 1 if branch instruction and ALU result is 0 (beq == true)
 assign mem_PCSrc = mem_Branch & mem_Zero;
 
 // Pipeline the branch logic signal and PC to next stage
@@ -362,9 +370,7 @@ end
 ***    Pipelining EX signals    ***
 **********************************/
 
-// signals for pipelining
-logic [31:0] wb_alu_result, wb_branch_addr;
-logic wb_MemtoReg, wb_RegWrite, wb_writeReg
+
 // Pipeline signals to be used in the wb stage
 always_ff @(posedge clk) begin
     if (rst) begin
@@ -373,6 +379,7 @@ always_ff @(posedge clk) begin
         wb_RegWrite <= 1'b0;
         wb_writeReg <= 1'b0;
         wb_branch_addr <= 0;
+        wb_read2 <= 0;
     end
     else begin
         wb_alu_result <= mem_alu_result;
@@ -380,6 +387,7 @@ always_ff @(posedge clk) begin
         wb_RegWrite <= mem_RegWrite;
         wb_writeReg <= mem_writeReg;
         wb_branch_addr <= mem_branch_addr;
+        wb_read2 <= mem_read2;
     end
 end
 
@@ -389,15 +397,13 @@ end
 //////////////////////////////////////////////////////////////////////
 
 
-// write back data
-logic [31:0] wb_writeData;
 // Assign writeBackData to be MemRead value if MemtoReg is high
-assign wb_writeData = MemtoReg ? mem_MemRead : mem_alu_result;
+assign wb_writeData = wb_MemtoReg ? dReadData : wb_alu_result;
 
 // Assign top level ports
 assign WriteBackData = wb_writeData;
-assign dWriteData = mem_writeData;
-assign ALUResult = ex_ALUResult;
+assign dWriteData = mem_read2;
+assign ALUResult = ex_alu_result;
 assign PC = if_PC;
 
 endmodule

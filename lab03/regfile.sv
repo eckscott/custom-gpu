@@ -46,7 +46,7 @@ module regfile(
     always_ff@(posedge clk) begin
         readData1 <= register[readReg1];
         readData2 <= register[readReg2];
-        if (write && writeReg != 0) begin
+        if (write && (writeReg != 0)) begin
             register[writeReg] <= writeData;
             if (readReg1 == writeReg)
                 readData1 <= writeData;
