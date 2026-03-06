@@ -1,12 +1,12 @@
 ##########################################################################
 #
-# Filename: synth_riscv_multicycle.tcl
+# Filename: synth_riscv_basic_pipeline.tcl
 #
 # Author: Ethan Scott
 # Class: ECEN 423, Sec 01, Winter 2026
 # Date: 05 March 2026
 #
-# This .tcl script is used to synthesize the riscv_multicycle design
+# This .tcl script is used to synthesize the riscv_basic_pipeline design
 #
 ##########################################################################
 
@@ -19,7 +19,7 @@ read_verilog -sv ../lab02/alu.sv
 source ../resources/messages.tcl
 
 # Run the sythesis command
-synth_design -top riscv_multicycle -part xc7a35tcpg236-1 -verbose -include_dirs {../include} -mode out_of_context
+synth_design -top riscv_basic_pipeline -part xc7a35tcpg236-1 -verbose -include_dirs {../include} -mode out_of_context
 
 # Write out the synthesized design checkpoint. This checkpoint file
 # is needed for the implementation step.
