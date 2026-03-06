@@ -13,7 +13,14 @@
 * Class: ECEN 423, Sec 01, Winter 2026
 * Date: 03 March 2026
 * Modules: regfile.sv, alu.sv
-* Description:
+* Description: Basic RISCV processor with 5 stage pipelining implemented.
+*    This module accomplishes the same purpose described in
+*    ../lab06/riscv_multicycle.sv but now implements pipelining rather than
+*    implementing the processor through a state machine. The module reads in
+*    an instruction (IF), decodes it (ID), executes all needed logic (EX),
+*    performs any memory reads or memory writes (MEM), and writes back the
+*    data into the register if needed (WB). All signals are differentiated
+*    by their respective pipeline stage by those same prefixes.
 * 
 ****************************************************************************/
 
@@ -26,6 +33,8 @@ module riscv_basic_pipeline #(parameter logic [31:0] INITIAL_PC = 32'h0000_3000)
 
 localparam PC_NORMAL_INCREMENT = 4'b0100;
 
+// opcode instruction pipeline
+logic [6:0] id_inst_op, ex_inst_op;
 // PC signals used for instruction fetch and instruction decode stages
 logic [31:0] if_PC, id_PC;
 /* the control signals that are decoded from the instruction in this stage
@@ -62,11 +71,6 @@ logic wb_MemtoReg, wb_RegWrite;
 // write back data
 logic [31:0] wb_writeData, mem_read2, wb_read2;
 
-/* This block performs the combinational logic needed for adding the immediate
-*  value to the PC for branch instructions */
-logic [31:0] if_pc_inc;
-assign if_pc_inc = wb_PCSrc ? (wb_branch_addr) : (PC_NORMAL_INCREMENT);
-
 
 //////////////////////////////////////////////////////////////////////
 // IF: Instruction Fetch
@@ -79,8 +83,12 @@ assign if_pc_inc = wb_PCSrc ? (wb_branch_addr) : (PC_NORMAL_INCREMENT);
 always_ff @(posedge clk) begin
     if (rst)
         if_PC <= INITIAL_PC;
-    else 
-        if_PC <= if_PC + if_pc_inc;
+    else begin
+        if (mem_PCSrc)
+            if_PC <= wb_branch_addr;
+        else
+            if_PC <= if_PC + PC_NORMAL_INCREMENT;
+    end
 end
 
 /* This block passes the PC from the instruction fetch stage to the instruction
@@ -248,6 +256,16 @@ always_ff @(posedge clk)begin
         mem_writeReg <= ex_writeReg;
 end
 
+// instruction code opcode
+assign id_inst_op = instruction[OPCODE_MSB:OPCODE_LSB];
+
+// pipeline instruction code opcode
+always_ff @(posedge clk) begin
+    if (rst)
+        ex_inst_op <= 0;
+    else
+        ex_inst_op <= id_inst_op;
+end
 
 //////////////////////////////////////////////////////////////////////
 // EX: Execute
@@ -262,15 +280,15 @@ end
 // an immediate value, determined by (ALUSrc)
 always_comb begin
     if (ex_ALUSrc) begin
-        if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW)
+        if (ex_inst_op == OPCODE_SW)
             ex_op2 = ex_immS;
-        else if (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE)
+        else if (ex_inst_op == OPCODE_SB_TYPE)
             ex_op2 = ex_immSB;
         else
             ex_op2 = ex_immI;
     end
     else
-        ex_op2 = ex_read2; // ex_op2 = id_ReadData2 ??
+        ex_op2 = ex_read2;
 end
 
 // Instantiate the ALU module as described above. Further details on the
@@ -297,16 +315,16 @@ end
 **********************************/
 
 // calculate branch target address
-assign ex_branch_addr = ex_PC + ex_immSB;
+assign mem_branch_addr = ex_PC + ex_immSB;
 
 // Pipeline PC and branch addr calculated
 always_ff @(posedge clk) begin
     if (rst) begin
-        mem_branch_addr <= 0;
+        wb_branch_addr <= 0;
         mem_PC <= INITIAL_PC;
     end
     else begin
-        mem_branch_addr <= ex_branch_addr;
+        wb_branch_addr <= mem_branch_addr;
         mem_PC <= ex_PC;
     end
 end
@@ -378,7 +396,6 @@ always_ff @(posedge clk) begin
         wb_MemtoReg <= 1'b0;
         wb_RegWrite <= 1'b0;
         wb_writeReg <= 1'b0;
-        wb_branch_addr <= 0;
         wb_read2 <= 0;
     end
     else begin
@@ -386,7 +403,6 @@ always_ff @(posedge clk) begin
         wb_MemtoReg <= mem_MemtoReg;
         wb_RegWrite <= mem_RegWrite;
         wb_writeReg <= mem_writeReg;
-        wb_branch_addr <= mem_branch_addr;
         wb_read2 <= mem_read2;
     end
 end
