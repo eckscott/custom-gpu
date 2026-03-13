@@ -73,10 +73,10 @@ logic mem_PCSrc, wb_PCSrc;
 logic [31:0] wb_alu_result, wb_branch_addr;
 logic wb_MemtoReg, wb_RegWrite;
 // write back data
-logic [31:0] wb_writeData, mem_read2, wb_read2;
+logic [31:0] wb_writeData, mem_read2, wb_read2, ex_mem2;
 // forward select signals for the MUX
 logic [1:0] forwardA, forwardB;
-logic is_immediate;
+logic is_forwarded;
 logic [31:0] ex_op1, ex_temp_op2, ex_final_op2;
 // Hazard detection signals
 logic load_use_hazard, branch_mem_taken, branch_wb_taken, loadPC;
@@ -90,7 +90,7 @@ logic load_use_hazard, branch_mem_taken, branch_wb_taken, loadPC;
 // logic for determining if there's a load_use_hazard
 assign load_use_hazard = (ex_MemRead) &&
                         ((ex_writeReg == id_rs1) || (ex_writeReg == id_rs2)) &&
-                        (!(mem_Branch && mem_Zero)) ? 0 : 1;
+                        (!(mem_Branch && mem_Zero)) ? 1 : 0;
 
 // Setting loadPC to 0 if there is a load_use_hazard
 assign loadPC = ~load_use_hazard;
@@ -336,9 +336,16 @@ always_ff @(posedge clk)begin
         mem_writeReg <= 0;
     end
     else begin
-        mem_rs1 <= ex_rs1;
-        mem_rs2 <= ex_rs2;
-        mem_writeReg <= ex_writeReg;
+        if (branch_mem_taken) begin
+            mem_rs1 <= 0;
+            mem_rs2 <= 0;
+            mem_writeReg <= 0;
+        end
+        else begin
+            mem_rs1 <= ex_rs1;
+            mem_rs2 <= ex_rs2;
+            mem_writeReg <= ex_writeReg;
+        end
     end
 end
 
@@ -350,15 +357,19 @@ end
 // an immediate value, determined by (ALUSrc)
 always_comb begin
     if (ex_ALUSrc) begin
-        if (ex_inst_op == OPCODE_SW)
+        if (ex_inst_op == OPCODE_SW) begin
             ex_op2 = ex_immS;
-        else if (ex_inst_op == OPCODE_SB_TYPE)
+        end
+        else if (ex_inst_op == OPCODE_SB_TYPE) begin
             ex_op2 = ex_immSB;
-        else
+        end
+        else begin
             ex_op2 = ex_immI;
+        end
     end
-    else
+    else begin
         ex_op2 = ex_read2;
+    end
 end
 
 /**********************************
@@ -394,7 +405,7 @@ always_comb begin
     case(forwardA)
         NO_FW: ex_op1 = ex_read1;
         FW_MEM: ex_op1 = mem_alu_result;
-        FW_WB: ex_op1 = wb_alu_result;
+        FW_WB: ex_op1 = wb_writeData;
         default: ex_op1 = ex_read1;
     endcase
 end
@@ -404,15 +415,30 @@ end
 * the MEM stage or the WB stage */
 always_comb begin
     case(forwardB)
-        NO_FW: ex_temp_op2 = ex_op2;
-        FW_MEM: ex_temp_op2 = mem_alu_result;
-        FW_WB: ex_temp_op2 = wb_alu_result;
-        default: ex_temp_op2 = ex_op2;
+        NO_FW: begin
+            ex_temp_op2 = ex_op2;
+            is_forwarded = 0;
+        end
+        FW_MEM: begin
+            ex_temp_op2 = mem_alu_result;
+            is_forwarded = 1;
+        end
+        FW_WB: begin
+            ex_temp_op2 = wb_writeData;
+            is_forwarded = 1;
+        end
+        default: begin
+            ex_temp_op2 = ex_op2;
+            is_forwarded = 0;
+        end
     endcase
 end
 
-//Correct any overwritten immediate value from incorrect forwarding
-assign ex_final_op2 = is_immediate ? ex_op2 : ex_temp_op2;
+// Correct any overwritten immediate value from incorrect forwarding
+assign ex_final_op2 = ex_ALUSrc ? ex_op2 : ex_temp_op2;
+
+// Forwarding for branch and sw instructions
+assign ex_mem2 = is_forwarded ? ex_temp_op2 : ex_read2;
 
 // Instantiate the ALU module as described above. Further details on the
 // function of each signal can be found in the alu.sv file
@@ -427,9 +453,16 @@ always_ff @(posedge clk) begin
         mem_read2 <= 0;
     end
     else begin
-        mem_Zero <= ex_Zero;
-        mem_alu_result <= ex_alu_result;
-        mem_read2 <= ex_read2;
+        if (branch_mem_taken) begin
+            mem_Zero <= 0;
+            mem_alu_result <= 0;
+            mem_read2 <= 0;
+        end
+        else begin
+            mem_Zero <= ex_Zero;
+            mem_alu_result <= ex_alu_result;
+            mem_read2 <= ex_mem2;
+        end
     end
 end
 
@@ -447,8 +480,14 @@ always_ff @(posedge clk) begin
         mem_PC <= INITIAL_PC;
     end
     else begin
-        wb_branch_addr <= mem_branch_addr;
-        mem_PC <= ex_PC;
+        if (branch_mem_taken) begin
+            wb_branch_addr <= 0;
+            mem_PC <= ex_PC;
+        end
+        else begin
+            wb_branch_addr <= mem_branch_addr;
+            mem_PC <= ex_PC;
+        end
     end
 end
 
@@ -466,11 +505,20 @@ always_ff @(posedge clk) begin
         mem_RegWrite <= 0;
     end
     else begin
-        mem_Branch <= ex_Branch;
-        mem_MemWrite <= ex_MemWrite;
-        mem_MemRead <= ex_MemRead;
-        mem_MemtoReg <= ex_MemtoReg;
-        mem_RegWrite <= ex_RegWrite;
+        if (branch_mem_taken) begin
+            mem_Branch <= 0;
+            mem_MemWrite <= 0;
+            mem_MemRead <= 0;
+            mem_MemtoReg <= 0;
+            mem_RegWrite <= 0;
+        end
+        else begin
+            mem_Branch <= ex_Branch;
+            mem_MemWrite <= ex_MemWrite;
+            mem_MemRead <= ex_MemRead;
+            mem_MemtoReg <= ex_MemtoReg;
+            mem_RegWrite <= ex_RegWrite;
+        end
     end
 end
 
