@@ -5,16 +5,13 @@ include ../resources/iosystem/iosystem.mk
 # Simulation Rules
 ####################################################
 
-elab_buttoncount: analyze_multicycle_iosystem buttoncount_text.mem
-	xelab multicycle_iosystem -s multicycle_iosystem --nolog  \
-		-debug typical -timescale 1ns/100ps \
-		-generic "TEXT_MEM=buttoncount_text.mem" \
-		-generic "USE_DEBOUNCER=0" \
-		-L unisims_ver glbl \
 
-# Simulation of top-level design without testbench using the template tcl file
-sim_buttoncount: elab_buttoncount
-	xsim multicycle_iosystem --nolog -tclbatch buttoncount.tcl
+
+# Create a bitstream for the move_char test program by loading the appropriate memory files into the design checkpoint
+forwarding_move_char.bit: forwarding_iosystem.bit move_char_text.mem move_char_data.mem
+	vivado -mode batch -source ../resources/load_mem.tcl -log forwarding_move_char.log \
+		-tclargs updateMem forwarding_iosystem.dcp \
+		move_char_text.mem move_char_data.mem forwarding_move_char.bit 
 
 ################################
 # Implementation

@@ -54,8 +54,8 @@
 # ASCII SPACE
 	.eqv SPACE_CHAR 0x20
 	.eqv HASH_CHAR 0x23
-	.eqv LAST_COLUMN 77			# 79 - last two columns don't show on screen
-	.eqv LAST_ROW 29			# 31 - last two rows don't show on screen
+	.eqv LAST_COLUMN 10			# 79 - last two columns don't show on screen
+	.eqv LAST_ROW 10			# 31 - last two rows don't show on screen
 	.eqv ADDRESSES_PER_ROW 512
 	.eqv NEG_ADDRESSES_PER_ROW -512
 
@@ -85,11 +85,15 @@ main:
 CLEAR_VGA:
 
 	# Set the foreground to 0xf80
-    addi t2, x0, VGA_FOREGROUND
+    addi t2, x0, 0xf
+	slli t2, t2, 8
+	ori t2, t2, 0x80
     # Set the background to 0x92e
-    addi t3, x0, VGA_BACKGROUND
+    addi t3, x0, 0x9
+	slli t3, t3, 8
+	ori t3, t3, 0x2e
     # Set the reserved bits
-    addi t4, x0, VGA_RESERVED
+    addi t4, x0, 0
     # Shift reserved and background
     slli t4, t4, 24
     slli t3, t3, 12
@@ -97,6 +101,12 @@ CLEAR_VGA:
     add t4, t3, t2
     # Write the new color values
     sw t4, CHAR_COLOR_OFFSET(gp)
+
+CLEAR_SEVEN_SEG:
+
+	# Clear Seven segment display and LEDs
+	sw x0, SEVENSEG_OFFSET(gp)
+	sw x0, LED_OFFSET(gp)
 
 	# Write a space to all locations in VGA memory
 	addi t0, x0, SPACE_CHAR		# ASCII character for space
@@ -106,26 +116,70 @@ CLEAR_VGA:
 	# should get 0x1000
 	slli t2, t2, 2
 
-L5:
+CLEAR_LOOP:
 	sw t0, 0(t1)			# Write 'space' character to pointer in VGA space
 	addi t2, t2, -1			# Decrement counter
-	beq t2, x0, L6			# Exit loop when done
+	beq t2, x0, PRINT_NET_ID	# Exit loop when done
 	addi t1, t1, 4			# Increment memory pointer by 4 to next character address
-	beq x0, x0, L5
-L6:
-	# Done initializing screen
-	# Initialize the VGA character write constants
+	beq x0, x0, CLEAR_LOOP
+
+PRINT_NET_ID:
+
+	# Set row address to 24
+	addi t2, x0, 24
+	# Shift row address to fit bits [13:9]
+	slli t2, t2, 9
+	# Set column address to 60
+	addi t3, x0, 60
+	# Shift column address to fit bits [8:2]
+	slli t3, t3, 2
+	# Set VGA character address for writing to (60,24)
+	or t4, t3, t2
+	add t4, t4, tp
+
+	# Write character 'E'
+	addi t1, x0, 0x45
+	sw t1, 0(t4)
+
+	# Write character 'C' to next char space
+	addi t1, x0, 0x43
+	sw t1, 4(t4)
+
+	# Write character 'K' to next char space
+	addi t1, x0, 0x4B
+	sw t1, 8(t4)
+
+	# Write character 'S' to next char space
+	addi t1, x0, 0x53
+	sw t1, 12(t4)
+
+	# Write character 'C' to next char space
+	addi t1, x0, 0x43
+	sw t1, 16(t4)
+
+	#Write Character 'O' to next char space
+	addi t1, x0, 0x4F
+	sw t1, 20(t4)
+
+	#Write Character 'T' to next 2 char spaces
+	addi t1, x0, 0x54
+	sw t1, 24(t4)
+	sw t1, 28(t4)
+
 	addi s0, tp, 0			# s0: pointer to VGA locations
 	addi s1, x0, 0			# s1: current column
 	addi s2, x0, 0			# s2: current row
-	# Clear Seven segment display and LEDs
-	sw x0, SEVENSEG_OFFSET(gp)
-	sw x0, LED_OFFSET(gp)
 
-	# Wait until all the buttons are released before proceeding to check for status of buttons
+SMILEY_FACE:
+	#Write a smiley face to 0,0
+	addi t1, x0, 0x01
+	sw t1, 0(s0)
+
+# Wait until all the buttons are released before proceeding to check for status of buttons
 	# (this is a one shot functionality to prevent one button press from causing more than one
 	#  response)
 BTN_RELEASE:
+
 	lw t0, BUTTON_OFFSET(gp)
 	# Keep jumping back until a button is pressed
 	beq x0, t0, BTN_PRESS
@@ -164,48 +218,39 @@ PROCESS_BTNR:
 	addi t0, x0, LAST_COLUMN
 	beq s1, t0, BTN_RELEASE                     # Ignore if on last column
 	addi s1, s1, 1                              # Increment column
+	addi t1, x0, SPACE_CHAR						# Write space where smiley was
+	sw t1, 0(s0)
 	addi s0, s0, 4                              # Increment pointer for next display location
-	beq x0, x0, DISPLAY_LOCATION
+	beq x0, x0, SMILEY_FACE
 
 PROCESS_BTNL:
 	# Move pointer left
 	beq s1, x0, BTN_RELEASE                     # Ignore if on first column
 	addi s1, s1, -1                             # Decrement column
+	addi t1, x0, SPACE_CHAR						# Write space where smiley was
+	sw t1, 0(s0)
 	addi s0, s0, -4                             # Decrement pointer for next display location
-	beq x0, x0, DISPLAY_LOCATION
+	beq x0, x0, SMILEY_FACE
 
 PROCESS_BTNU:
 	# Move pointer Up
 	beq s2, x0, BTN_RELEASE                     # Ignore if on first row
 	addi s2, s2, -1                             # Decrement row
+	addi t1, x0, SPACE_CHAR						# Write space where smiley was
+	sw t1, 0(s0)
 	addi s0, s0, NEG_ADDRESSES_PER_ROW          # Decrement pointer
-	beq x0, x0, DISPLAY_LOCATION
+	beq x0, x0, SMILEY_FACE
 
 PROCESS_BTND:
 	# Move pointer Down
 	addi t0, x0, LAST_ROW
 	beq s2, t0, BTN_RELEASE                     # Ignore if on last row
 	addi s2, s2, 1                              # Increment row
+	addi t1, x0, SPACE_CHAR						# Write space where smiley was
+	sw t1, 0(s0)
 	addi s0, s0, ADDRESSES_PER_ROW              # Increment pointer
-	beq x0, x0, DISPLAY_LOCATION
+	beq x0, x0, SMILEY_FACE
 
-DISPLAY_LOCATION:
-	# Display the character at the current location
-	lw t1, SWITCH_OFFSET(gp)                    # Read the switches
-	addi t2, x0, SWITCH_MASK_7                    # Create mask for switches (only look at bottom 7)
-	and t1, t1, t2                              # Keep only lower 7 bits of switches
-	sw t1, 0(s0)                                # Write the character to the VGA
 
-	# Display pointer on LCD
-	sw s0, SEVENSEG_OFFSET(gp)
-	# Display col,row on LEDs
-	add t0, s1, x0                              # Load s1 (column) to t0
-	# Shift by 8
-	slli t0, t0, 8
-	# Or s2 (row)
-	or t0, t0, s2
-	# Write to LEDs
-	sw t0, LED_OFFSET(gp)
 
-	# Go back to button release
-	beq x0, x0, BTN_RELEASE
+
