@@ -81,6 +81,12 @@
     localparam OR = 3'b110;
     localparam AND = 3'b111;
 
+    // Different Branch FUNCT3 codes
+    localparam BEQ = 3'b000;
+    localparam BNE = 3'b001;
+    localparam BLT = 3'b100;
+    localparam BGE = 3'b101;
+
     // Different FUNCT7 codes
     localparam FUNCT7_ADD = 7'b0000000;
     localparam FUNCT7_SRL = 7'b0000000;

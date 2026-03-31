@@ -51,16 +51,16 @@ logic [31:0] id_immI, ex_immI, id_immS, ex_immS, id_immSB, ex_immSB, id_immU, ex
 // ex_PC signal
 logic [31:0] ex_PC;
 // intermediate signals needed to connect to regfile as described below
-logic [4:0] id_rs1, id_rs2, ex_writeReg, id_writeReg, ex_rs1, ex_rs2;
+logic [4:0] id_rs1, id_rs2, ex_writeReg, id_writeReg, ex_rs1, ex_rs2, ex_temp_rs1;
 // writeReg pipeline signal
 logic [4:0] mem_writeReg, wb_writeReg, mem_rs1, mem_rs2;
 // Second operand for ALU operations and result
-logic [31:0] ex_read1, ex_read2, ex_op2, ex_alu_result, ex_temp_read1;
-// zero signal for alu output
-logic ex_Zero;
-// Pipeline registers for alu_result and Zero
+logic [31:0] ex_read1, ex_read2, ex_op2, ex_alu_result;
+// branch signals for alu output
+logic ex_Zero, ex_Less_Than;
+// Pipeline registers for alu_result and branch signals
 logic [31:0] mem_alu_result;
-logic mem_Zero;
+logic mem_Zero, mem_Less_Than;
 // Pipeline ctrl signals for mem stage
 logic mem_Branch, mem_MemWrite, mem_MemRead, mem_MemtoReg, mem_RegWrite;
 // branch target addr signal and pipeline PC signal
@@ -80,6 +80,8 @@ logic is_forwarded;
 logic [31:0] ex_op1, ex_temp_op2, ex_final_op2;
 // Hazard detection signals
 logic load_use_hazard, branch_mem_taken, branch_wb_taken, loadPC;
+// Branch funct3 to determine which branch to perform
+logic [2:0] id_branch_f3, ex_branch_f3, mem_branch_f3;
 
 
 //////////////////////////////////////////////////////////////////////
@@ -168,6 +170,9 @@ always_comb begin
         endcase
     end       
 end
+
+// Assign func3 bits for pipelining
+assign id_branch_f3 = instruction[FUNCT3_MSB:FUNCT3_LSB];
 
 /* Set id_ALUSrc to 1 for instructions that require an immediate value, and 0
    for all other instructions */
@@ -293,7 +298,7 @@ assign id_writeReg = instruction[RD_MSB:RD_LSB];
 *  Piplined down and the WB signals are connected back to this module */
 regfile rf(.clk(clk), .write(wb_RegWrite), .readReg1(id_rs1),
            .readReg2(id_rs2), .writeReg(wb_writeReg),
-           .writeData(WriteBackData), .readData1(ex_temp_read1),
+           .writeData(WriteBackData), .readData1(ex_read1),
            .readData2(ex_read2));
 
 // Pipeline register addresses
@@ -302,17 +307,26 @@ always_ff @(posedge clk)begin
         ex_rs1 <= 0;
         ex_rs2 <= 0;
         ex_writeReg <= 0;
+        ex_branch_f3 <= 0;
     end
     else begin
         if (load_use_hazard || branch_mem_taken || branch_wb_taken) begin
             ex_rs1 <= 0;
             ex_rs2 <= 0;
             ex_writeReg <= 0;
+            ex_branch_f3 <= 0;
+        end
+        else if (id_inst_op == OPCODE_U_TYPE) begin
+            ex_rs1 <= 0;
+            ex_rs2 <= id_rs2;
+            ex_writeReg <= id_writeReg;
+            ex_branch_f3 <= id_branch_f3;
         end
         else begin
             ex_rs1 <= id_rs1;
             ex_rs2 <= id_rs2;
             ex_writeReg <= id_writeReg;
+            ex_branch_f3 <= id_branch_f3;
         end
     end
 end
@@ -367,24 +381,19 @@ always_comb begin
     if (ex_ALUSrc) begin
         if (ex_inst_op == OPCODE_SW) begin
             ex_op2 = ex_immS;
-            ex_read1 = ex_temp_read1;
         end
         else if (ex_inst_op == OPCODE_SB_TYPE) begin
             ex_op2 = ex_immSB;
-            ex_read1 = ex_temp_read1;
         end
         else if (ex_inst_op == OPCODE_U_TYPE) begin
             ex_op2 = ex_immU;
-            ex_read1 = 0;
         end
         else begin
             ex_op2 = ex_immI;
-            ex_read1 = ex_temp_read1;
         end
     end
     else begin
         ex_op2 = ex_read2;
-        ex_read1 = ex_temp_read1;
     end
 end
 
@@ -461,23 +470,32 @@ assign ex_mem2 = is_forwarded ? ex_temp_op2 : ex_read2;
 alu alu(.op1(ex_op1), .op2(ex_final_op2), .alu_op(ex_ALUCtrl), .zero(ex_Zero),
         .result(ex_alu_result));
 
+// Less than signal for branch operations
+assign ex_Less_Than = (ex_alu_result < 0);
+
 // Pipeline ALU output and Zero signal
 always_ff @(posedge clk) begin
     if (rst) begin
         mem_Zero <= 0;
+        mem_Less_Than <= 0;
         mem_alu_result <= 0;
         mem_read2 <= 0;
+        mem_branch_f3 <= 0;
     end
     else begin
         if (branch_mem_taken) begin
             mem_Zero <= 0;
             mem_alu_result <= 0;
             mem_read2 <= 0;
+            mem_Less_Than <= 0;
+            mem_branch_f3 <= 0;
         end
         else begin
             mem_Zero <= ex_Zero;
+            mem_Less_Than <= ex_Less_Than;
             mem_alu_result <= ex_alu_result;
             mem_read2 <= ex_mem2;
+            mem_branch_f3 <= ex_branch_f3;
         end
     end
 end
@@ -556,8 +574,16 @@ assign MemWrite = mem_MemWrite;
 ***         Branch Logic        ***
 **********************************/
 
-// Set PCSrc to 1 if branch instruction and ALU result is 0 (beq == true)
-assign mem_PCSrc = mem_Branch & mem_Zero;
+// Set PCSrc to 1 if branch instruction condition is met
+always_comb begin
+    case (mem_branch_f3)
+        BEQ: mem_PCSrc = mem_Branch & mem_Zero;
+        BNE: mem_PCSrc = mem_Branch & (~mem_Zero) & (~mem_Less_Than);
+        BLT: mem_PCSrc = mem_Branch & mem_Less_Than;
+        BGE: mem_PCSrc = mem_Branch & (~mem_Less_Than);
+        default: mem_PCSrc = 0;
+    endcase
+end
 
 // Pipeline the branch logic signal and PC to next stage
 always_ff @(posedge clk) begin
