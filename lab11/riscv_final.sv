@@ -38,7 +38,7 @@ localparam FW_WB = 2'b10;
 localparam NO_FW = 2'b00;
 
 // opcode instruction pipeline
-logic [6:0] id_inst_op, ex_inst_op;
+logic [6:0] id_inst_op, ex_inst_op, mem_inst_op;
 // PC signals used for instruction fetch and instruction decode stages
 logic [31:0] if_PC, id_PC;
 /* the control signals that are decoded from the instruction in this stage
@@ -48,6 +48,7 @@ logic id_ALUSrc, ex_ALUSrc, id_MemWrite, ex_MemWrite, id_MemRead, ex_MemRead, id
       ex_Branch, id_RegWrite, ex_RegWrite, id_MemtoReg, ex_MemtoReg;
 // 32-bit sign extended immediate values for each different operation type
 logic [31:0] id_immI, ex_immI, id_immS, ex_immS, id_immSB, ex_immSB, id_immU, ex_immU;
+logic [31:0] id_immUJ, ex_immUJ, mem_immUJ;
 // ex_PC signal
 logic [31:0] ex_PC;
 // intermediate signals needed to connect to regfile as described below
@@ -55,7 +56,7 @@ logic [4:0] id_rs1, id_rs2, ex_writeReg, id_writeReg, ex_rs1, ex_rs2, ex_temp_rs
 // writeReg pipeline signal
 logic [4:0] mem_writeReg, wb_writeReg, mem_rs1, mem_rs2;
 // Second operand for ALU operations and result
-logic [31:0] ex_read1, ex_read2, ex_op2, ex_alu_result;
+logic [31:0] ex_read1, ex_read2, ex_op2, ex_alu_result, ex_final_alu_result;
 // branch signals for alu output
 logic ex_Zero, ex_Less_Than;
 // Pipeline registers for alu_result and branch signals
@@ -64,13 +65,13 @@ logic mem_Zero, mem_Less_Than;
 // Pipeline ctrl signals for mem stage
 logic mem_Branch, mem_MemWrite, mem_MemRead, mem_MemtoReg, mem_RegWrite;
 // branch target addr signal and pipeline PC signal
-logic [31:0] ex_branch_addr, mem_branch_addr, mem_PC;
+logic [31:0] mem_branch_addr, mem_jal_addr, mem_jalr_addr, mem_PC;
 // PC pipelined to the wb stage
 logic [31:0] wb_PC;
 // PCSrc control signal used to determine how the PC is incremented
 logic mem_PCSrc, wb_PCSrc;
 // signals for pipelining
-logic [31:0] wb_alu_result, wb_branch_addr;
+logic [31:0] wb_alu_result, mem_PC_target, wb_PC_target;
 logic wb_MemtoReg, wb_RegWrite;
 // write back data
 logic [31:0] wb_writeData, mem_read2, wb_read2, ex_mem2;
@@ -115,7 +116,7 @@ always_ff @(posedge clk) begin
     else begin
         if (loadPC) begin
             if (mem_PCSrc)
-                if_PC <= wb_branch_addr;
+                if_PC <= wb_PC_target;
             else
                 if_PC <= if_PC + PC_NORMAL_INCREMENT;
         end
@@ -179,7 +180,9 @@ assign id_branch_f3 = instruction[FUNCT3_MSB:FUNCT3_LSB];
 assign id_ALUSrc = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE) ||
                    (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW) ||
                    (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW) ||
-                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_U_TYPE);
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_U_TYPE)
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JAL) ||
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JALR);
 
 /* Combinational logic blocks to assign id_MemRead and id_MemWrite signals depending
 *  on if the instruction is a lw or a sw */
@@ -195,7 +198,9 @@ assign id_Branch = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE);
 assign id_RegWrite = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_R_TYPE) ||
                      (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE) ||
                      (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW) ||
-                     (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_U_TYPE);
+                     (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_U_TYPE) ||
+                     (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JAL) ||
+                     (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JALR);
 
 // Assert the id_MemtoReg signal for lw instructions, and deassert for all other
 assign id_MemtoReg = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW);
@@ -252,6 +257,12 @@ assign id_immSB = {{IMM_SB_SIGN_EXT_BITS{instruction[IMM_MSB]}},
                 1'b0};
 assign id_immU = {instruction[IMM_U_MSB:IMM_U_LSB],
                  {IMM_U_0_PAD_BITS{0}}};
+assign id_immUJ = {{IMM_UJ_SIGN_EXT_BITS{instruction[IMM_UJ_MSB]}},
+                instruction[IMM_UJ_MSB],
+                instruction[IMM_UJ_BIT_19:IMM_UJ_BIT_12],
+                instruction[IMM_UJ_BIT_11],
+                instruction[IMM_UJ_BIT_10:IMM_UJ_BIT_1],
+                1'b0};
 
 // ID Pipeline register passing information for immediate vals down pipeline
 always_ff @(posedge clk) begin
@@ -260,6 +271,7 @@ always_ff @(posedge clk) begin
         ex_immS <= 0;
         ex_immSB <= 0;
         ex_immU <= 0;
+        ex_immUJ <= 0;
     end
     else begin
         if (load_use_hazard || branch_mem_taken || branch_wb_taken) begin
@@ -267,12 +279,14 @@ always_ff @(posedge clk) begin
             ex_immS <= 0;
             ex_immSB <= 0;
             ex_immU <= 0;
+            ex_immUJ <= 0;
         end
         else begin
             ex_immI <= id_immI;
             ex_immS <= id_immS;
             ex_immSB <= id_immSB;
             ex_immU <= id_immU;
+            ex_immUJ <= id_immUJ;
         end
     end
 end
@@ -470,6 +484,15 @@ assign ex_mem2 = is_forwarded ? ex_temp_op2 : ex_read2;
 alu alu(.op1(ex_op1), .op2(ex_final_op2), .alu_op(ex_ALUCtrl), .zero(ex_Zero),
         .result(ex_alu_result));
 
+// if it's a jump command, change the alu result to be PC+4 to store it in a register
+always_comb begin
+    if ((ex_inst_op == OPCODE_JAL) ||
+        (ex_inst_op == OPCODE_JALR))
+        ex_final_alu_result = ex_PC + PC_NORMAL_INCREMENT;
+    else
+        ex_final_alu_result = ex_alu_result;
+end
+
 // Less than signal for branch operations
 assign ex_Less_Than = (ex_alu_result < 0);
 
@@ -481,6 +504,8 @@ always_ff @(posedge clk) begin
         mem_alu_result <= 0;
         mem_read2 <= 0;
         mem_branch_f3 <= 0;
+        mem_immUJ <= 0;
+        mem_inst_op <= 0;
     end
     else begin
         if (branch_mem_taken) begin
@@ -489,13 +514,17 @@ always_ff @(posedge clk) begin
             mem_read2 <= 0;
             mem_Less_Than <= 0;
             mem_branch_f3 <= 0;
+            mem_immUJ <= 0;
+            mem_inst_op <= 0;
         end
         else begin
             mem_Zero <= ex_Zero;
             mem_Less_Than <= ex_Less_Than;
-            mem_alu_result <= ex_alu_result;
+            mem_alu_result <= ex_final_alu_result;
             mem_read2 <= ex_mem2;
             mem_branch_f3 <= ex_branch_f3;
+            mem_immUJ <= ex_immUJ;
+            mem_inst_op <= ex_inst_op;
         end
     end
 end
@@ -506,20 +535,34 @@ end
 
 // calculate branch target address
 assign mem_branch_addr = ex_PC + ex_immSB;
+// calculate jal target address
+assign mem_jal_addr = ex_PC + ex_immUJ;
+// calculate jalr target address
+assign mem_jalr_addr = ex_alu_result;
+
+// always comb block to decide which jump address to use for PC target
+always_comb begin
+    if (ex_inst_op == OPCODE_JAL)
+        mem_PC_target = mem_jal_addr;
+    else if (ex_inst_op == OPCODE_SB_TYPE)
+        mem_PC_target = mem_branch_addr;
+    else
+        mem_PC_target = mem_jalr_addr;
+end
 
 // Pipeline PC and branch addr calculated
 always_ff @(posedge clk) begin
     if (rst) begin
-        wb_branch_addr <= 0;
+        wb_PC_target <= 0;
         mem_PC <= INITIAL_PC;
     end
     else begin
         if (branch_mem_taken) begin
-            wb_branch_addr <= 0;
+            wb_PC_target <= 0;
             mem_PC <= ex_PC;
         end
         else begin
-            wb_branch_addr <= mem_branch_addr;
+            wb_PC_target <= mem_PC_target;
             mem_PC <= ex_PC;
         end
     end
@@ -576,13 +619,18 @@ assign MemWrite = mem_MemWrite;
 
 // Set PCSrc to 1 if branch instruction condition is met
 always_comb begin
-    case (mem_branch_f3)
-        BEQ: mem_PCSrc = mem_Branch & mem_Zero;
-        BNE: mem_PCSrc = mem_Branch & (~mem_Zero) & (~mem_Less_Than);
-        BLT: mem_PCSrc = mem_Branch & mem_Less_Than;
-        BGE: mem_PCSrc = mem_Branch & (~mem_Less_Than);
-        default: mem_PCSrc = 0;
-    endcase
+    if ((mem_inst_op == OPCODE_JAL) ||
+        (mem_inst_op == OPCODE_JALR))
+        mem_PCSrc = 1;
+    else begin
+        case (mem_branch_f3)
+            BEQ: mem_PCSrc = mem_Branch & mem_Zero;
+            BNE: mem_PCSrc = mem_Branch & (~mem_Zero) & (~mem_Less_Than);
+            BLT: mem_PCSrc = mem_Branch & mem_Less_Than;
+            BGE: mem_PCSrc = mem_Branch & (~mem_Less_Than);
+            default: mem_PCSrc = 0;
+        endcase
+    end
 end
 
 // Pipeline the branch logic signal and PC to next stage
