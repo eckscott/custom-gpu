@@ -41,12 +41,15 @@
     localparam IMM_UJ_BIT_12 = 12;
     localparam IMM_UJ_BIT_11 = 20;
     localparam IMM_UJ_BIT_10_1 = 30;
+    localparam IMM_U_MSB = 31;
+    localparam IMM_U_LSB = 12;
 
     // Bit lengths for padding to 32-bit immediates
     localparam IMM_I_SIGN_EXT_BITS = 20;
     localparam IMM_S_SIGN_EXT_BITS = 20;
     localparam IMM_SB_SIGN_EXT_BITS = 19;
     localparam IMM_UJ_SIGN_EXT_BITS = 11;
+    localparam IMM_U_0_PAD_BITS = 12;
 
     // Register addressing in instruction
     localparam RS_2_MSB = 24;
