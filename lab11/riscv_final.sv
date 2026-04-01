@@ -93,7 +93,7 @@ logic [2:0] id_branch_f3, ex_branch_f3, mem_branch_f3;
 // logic for determining if there's a load_use_hazard
 assign load_use_hazard = (ex_MemRead) &&
                         ((ex_writeReg == id_rs1) || (ex_writeReg == id_rs2)) &&
-                        (!(mem_Branch && mem_Zero)) ? 1 : 0;
+                        (!(mem_Branch && mem_PCSrc)) ? 1 : 0;
 
 // Setting loadPC to 0 if there is a load_use_hazard
 assign loadPC = ~load_use_hazard;
@@ -191,7 +191,9 @@ assign id_MemRead = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW);
 
 /* Combinational logic block to determine whether the instruction is a branch
 *  or not */
-assign id_Branch = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE);
+assign id_Branch = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SB_TYPE) ||
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JAL) ||
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JALR);
 
 /* Combinational logic for id_RegWrite Ctrl Signal which is only asserted for
 *  R_type, I_type, or lw instructions */
@@ -491,7 +493,7 @@ always_comb begin
 end
 
 // Less than signal for branch operations
-assign ex_Less_Than = (ex_alu_result < 0);
+assign ex_Less_Than = (ex_alu_result[ALU_MSB] == 1'b1);
 
 // Pipeline ALU output and Zero signal
 always_ff @(posedge clk) begin
@@ -622,8 +624,8 @@ always_comb begin
     else begin
         case (mem_branch_f3)
             BEQ: mem_PCSrc = mem_Branch & mem_Zero;
-            BNE: mem_PCSrc = mem_Branch & (~mem_Zero) & (~mem_Less_Than);
-            BLT: mem_PCSrc = mem_Branch & mem_Less_Than;
+            BNE: mem_PCSrc = mem_Branch & (~mem_Zero);
+            BLT: mem_PCSrc = mem_Branch & mem_Less_Than & (~mem_Zero);
             BGE: mem_PCSrc = mem_Branch & (~mem_Less_Than);
             default: mem_PCSrc = 0;
         endcase

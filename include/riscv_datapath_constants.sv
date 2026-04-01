@@ -89,6 +89,9 @@
     localparam BLT = 3'b100;
     localparam BGE = 3'b101;
 
+    // MSB of alu output (determines sign of ALU)
+    localparam ALU_MSB = 31;
+
     // Different FUNCT7 codes
     localparam FUNCT7_ADD = 7'b0000000;
     localparam FUNCT7_SRL = 7'b0000000;
