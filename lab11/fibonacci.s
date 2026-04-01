@@ -16,13 +16,11 @@
 #    a given input using a recursive approach.
 #########################################################################
 
+# The function needs to be in the text segment
+.text
 
 # The function names so the main program can call them (fib_main.s)
 .globl iterative_fibonacci
-.globl recursive_fibonacci
-
-# The function needs to be in the text segment
-.text
 
 iterative_fibonacci:		# Performs iterative fibonacci for input x10 (x10!) and returns result
                             # to x10
@@ -67,7 +65,12 @@ $L1:
     lw x1, 4(x2)     # Restore return address
     addi x2, x2, 8   # Update stack pointer
 
-    jalr x0, 0(x1)   # Return to caller
+    ret
+    nop
+    nop
+    nop
+
+.globl recursive_fibonacci
 
 recursive_fibonacci:	# Performs recursive fibonacci for input x10 (x10!) and
                         #returns result to x10
@@ -86,7 +89,10 @@ recursive_fibonacci:	# Performs recursive fibonacci for input x10 (x10!) and
     lw x8, 4(x2)       # Load saved register 2
     lw x1, 8(x2)       # Load return address back into x1
     addi x2, x2, 12     # reset stack pointer
-    jalr x0, 0(x1)     # return
+    ret    # return
+    nop
+    nop
+    nop
 
 $L1:
     addi x10, x18, -1  # n = n - 1

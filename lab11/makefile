@@ -18,6 +18,9 @@ sim_riscv_final: elab_tb_final
 sim_riscv_final_gui: elab_tb_final
 	xsim tb_riscv_final --log sim_riscv_final.log -gui
 
+fib_main.log: fibonacci.s
+  java -jar ../resources/rars1_6.jar fib_main.s fibonacci.s mc CompactTextAtZero 0x2000-0x207c s0 ic nc | tee fib_main.log
+
 
 ################################
 # Implementation
