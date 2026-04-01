@@ -52,11 +52,11 @@ logic [31:0] id_immUJ, ex_immUJ, mem_immUJ;
 // ex_PC signal
 logic [31:0] ex_PC;
 // intermediate signals needed to connect to regfile as described below
-logic [4:0] id_rs1, id_rs2, ex_writeReg, id_writeReg, ex_rs1, ex_rs2, ex_temp_rs1;
+logic [4:0] id_rs1, id_rs2, ex_writeReg, id_writeReg, ex_rs1, ex_rs2;
 // writeReg pipeline signal
 logic [4:0] mem_writeReg, wb_writeReg, mem_rs1, mem_rs2;
 // Second operand for ALU operations and result
-logic [31:0] ex_read1, ex_read2, ex_op2, ex_alu_result, ex_final_alu_result;
+logic [31:0] ex_read1, ex_temp_read1, ex_read2, ex_op2, ex_alu_result, ex_final_alu_result;
 // branch signals for alu output
 logic ex_Zero, ex_Less_Than;
 // Pipeline registers for alu_result and branch signals
@@ -180,7 +180,7 @@ assign id_branch_f3 = instruction[FUNCT3_MSB:FUNCT3_LSB];
 assign id_ALUSrc = (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_I_TYPE) ||
                    (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_LW) ||
                    (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_SW) ||
-                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_U_TYPE)
+                   (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_U_TYPE) ||
                    (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JAL) ||
                    (instruction[OPCODE_MSB:OPCODE_LSB] == OPCODE_JALR);
 
@@ -256,7 +256,7 @@ assign id_immSB = {{IMM_SB_SIGN_EXT_BITS{instruction[IMM_MSB]}},
                 instruction[IMM_SB_BIT_4:IMM_SB_BIT_1],
                 1'b0};
 assign id_immU = {instruction[IMM_U_MSB:IMM_U_LSB],
-                 {IMM_U_0_PAD_BITS{0}}};
+                 12'b0};
 assign id_immUJ = {{IMM_UJ_SIGN_EXT_BITS{instruction[IMM_UJ_MSB]}},
                 instruction[IMM_UJ_MSB],
                 instruction[IMM_UJ_BIT_19:IMM_UJ_BIT_12],
@@ -312,7 +312,7 @@ assign id_writeReg = instruction[RD_MSB:RD_LSB];
 *  Piplined down and the WB signals are connected back to this module */
 regfile rf(.clk(clk), .write(wb_RegWrite), .readReg1(id_rs1),
            .readReg2(id_rs2), .writeReg(wb_writeReg),
-           .writeData(WriteBackData), .readData1(ex_read1),
+           .writeData(WriteBackData), .readData1(ex_temp_read1),
            .readData2(ex_read2));
 
 // Pipeline register addresses
@@ -329,12 +329,6 @@ always_ff @(posedge clk)begin
             ex_rs2 <= 0;
             ex_writeReg <= 0;
             ex_branch_f3 <= 0;
-        end
-        else if (id_inst_op == OPCODE_U_TYPE) begin
-            ex_rs1 <= 0;
-            ex_rs2 <= id_rs2;
-            ex_writeReg <= id_writeReg;
-            ex_branch_f3 <= id_branch_f3;
         end
         else begin
             ex_rs1 <= id_rs1;
@@ -442,10 +436,10 @@ end
 * the MEM stage or the WB stage */
 always_comb begin
     case(forwardA)
-        NO_FW: ex_op1 = ex_read1;
-        FW_MEM: ex_op1 = mem_alu_result;
-        FW_WB: ex_op1 = wb_writeData;
-        default: ex_op1 = ex_read1;
+        NO_FW: ex_read1 = ex_temp_read1;
+        FW_MEM: ex_read1 = mem_alu_result;
+        FW_WB: ex_read1 = wb_writeData;
+        default: ex_read1 = ex_temp_read1;
     endcase
 end
 
@@ -478,6 +472,9 @@ assign ex_final_op2 = ex_ALUSrc ? ex_op2 : ex_temp_op2;
 
 // Forwarding for branch and sw instructions
 assign ex_mem2 = is_forwarded ? ex_temp_op2 : ex_read2;
+
+// for lui instruction (set op1 to 0, undoing forwarding)
+assign ex_op1 = (ex_inst_op == OPCODE_U_TYPE) ? 0 : ex_read1;
 
 // Instantiate the ALU module as described above. Further details on the
 // function of each signal can be found in the alu.sv file
