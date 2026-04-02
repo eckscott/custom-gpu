@@ -1,6 +1,6 @@
 #########################################################################
 #
-# Filename: fib_iterative.s
+# Filename: fibonacci.s
 # 
 # Author: Ethan Scott
 #
@@ -21,6 +21,7 @@
 
 # The function names so the main program can call them (fib_main.s)
 .globl iterative_fibonacci
+.globl recursive_fibonacci
 
 iterative_fibonacci:		# Performs iterative fibonacci for input x10 (x10!) and returns result
                             # to x10
@@ -70,8 +71,6 @@ $L1:
     nop
     nop
 
-.globl recursive_fibonacci
-
 recursive_fibonacci:	# Performs recursive fibonacci for input x10 (x10!) and
                         #returns result to x10
 
@@ -83,7 +82,7 @@ recursive_fibonacci:	# Performs recursive fibonacci for input x10 (x10!) and
     add x18, x10, x0   # store argument in x18
     
     addi x5, x0, 2     # Set temp reg to 2 for comparison
-    bge x10, x5, $L1   # n >= 2
+    bge x10, x5, $L5   # n >= 2
 
     lw x18, 0(x2)      # Load saved register 
     lw x8, 4(x2)       # Load saved register 2
@@ -94,7 +93,7 @@ recursive_fibonacci:	# Performs recursive fibonacci for input x10 (x10!) and
     nop
     nop
 
-$L1:
+$L5:
     addi x10, x18, -1  # n = n - 1
     jal x1, recursive_fibonacci  # fib(n - 1)
     add x8, x10, x0       # save fib(n-1) in x8

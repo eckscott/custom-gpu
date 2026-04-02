@@ -19,7 +19,23 @@ sim_riscv_final_gui: elab_tb_final
 	xsim tb_riscv_final --log sim_riscv_final.log -gui
 
 fib_main.log: fibonacci.s
-  java -jar ../resources/rars1_6.jar fib_main.s fibonacci.s mc CompactTextAtZero 0x2000-0x207c s0 ic nc | tee fib_main.log
+	java -jar ../resources/rars1_6.jar fib_main.s fibonacci.s mc CompactTextAtZero 0x2000-0x207c s0 ic nc | tee fib_main.log
+
+fib_main_text.mem: fib_main.s fibonacci.s
+	java -jar ../resources/rars1_6.jar fib_main.s fibonacci.s mc CompactTextAtZero \
+    a dump .text HexText fib_main_text.mem \
+	a dump .data HexText fib_main_data.mem a dump .text SegmentWindow fib_main_text.txt
+
+analyze_fib: ../include/riscv_memory.sv riscv_final.sv ../include/tb_riscv_pkg.sv tb_riscv_final.sv ../lab02/alu.sv ../lab03/regfile.sv
+	xvlog -i ../include $^ -sv --nolog
+
+elab_riscv_final_fib: analyze_fib fib_main_text.mem fib_main_data.mem
+	xelab --nolog tb_riscv_final -debug typical -timescale 1ns/100ps -s tb_riscv_final_fib \
+	-generic "TEXT_MEM=fib_main_text.mem" -generic "DATA_MEM=fib_main_data.mem" \
+    -generic "PRINT_MEMORY=1"
+
+sim_riscv_final_fib: elab_riscv_final_fib 
+	xsim tb_riscv_final_fib -log sim_riscv_final_fib.log -runall
 
 
 ################################
