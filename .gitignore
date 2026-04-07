@@ -23,7 +23,6 @@ xelab.pb
 # Add you own repository specific ignores below this line
 *.log
 *.dcp
-*.txt
 *.rpt
 *.bit
 */.Xil
