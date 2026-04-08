@@ -2,47 +2,47 @@
 #
 # custom_background.tXt
 #
-# This file provides a maCe background for custom game
+# This file provides a maze background for custom game
 #
 # Lines starting with a '#' are ignored and used for comments
 #
 #################################################
 
 .background_start
-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
-C     C   C               C         C             C               C    C    C
-C     C   C               C         C             C               C    C    C
-C     C   C      CCCCCC   C   CCCCCCCCCCCC   CCCCCCCCCC           C    C   CC
-C     CCCCC      C    C   C   C              C      C     CCCCC   C    C    C
-C                C    C       C              C   C  C     C       C    C    C
-C     CCCCCCCCCCCC    CCCCCCCCCCCCCC         C   C        C  CCCCCC    CCC  C
-C     C          C    C                  CCCCCCCCCCCC   CCC  C    C    C    C
-C     C     C    C    C        C             C            C  C              C
-C     C     C    C    C   CCCCCC             C     CCCCCCCC  C     CCCC     C
-C     C     C    C    C        CCCCCCCCC     C     C      C  C        C   CCC
-C     C     C    C             C             C            C  CCCCCCCCCC     C
-C     C     C    C       C     C     CCCCCCCCCCCCCCCCCC   C                 C
-C     C     C    C       C     C     C       C        C   C                 C
-C     C     CCCCCCCCCCCCCC     C     C                C   CCCCCCCCCCCCCCC   C
-C                C             C     C       CCCCCCCC     C             C   C
-CCCCCCCCCCCCC    C             C             C      CCCCCCC     C   C   C   C
-C           C    C       C     CCCCCCCCCCC   C                  C   C   C   C
-C    CCCC   C    C       C     C         C   C   CCCC     CCCCCCCCCCC   C   C
-C    C  C   C            C     C     CCCCC   C   C  C     C             C   C
-C    C  C   C            C     C             C      C     C      CCCCCCCC   C
-C    C      C    CCCCCCCCC   CCCC   CCCCCCCCCCCCCCCCC     C      C          C
-C    CCCCCCCC    C           C C                          C      CCC        C
-C           C    C           C CCCCCC   CCCCCCCCCCCCCCCCCCC      C      C   C
-C    CCCCCCCCCCCCCCCCCCCC    C C        C    C    C   C   C      C   CCCC   C
-C    C                         C                      C   CCCCCCCC      C   C
-C    CCCCCCCC   CCCCCCCCC    CCCCCCCC   CCCCCCCCC     C   C     C       C   C
-C               C       C    C      C           C     C   C     CCCCC   C   C
-C    CCCCCCCCCCCC       CCCCCC      CCCCCCCCCCCCC         C             C   C
-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
+Z     Z   Z               Z         Z             Z               Z    Z    Z
+Z     Z   Z               Z         Z             Z               Z    Z    Z
+Z     Z   Z      ZZZZZZ   Z   ZZZZZZZZZZZZ   ZZZZZZZZZZ           Z    Z   ZZ
+Z     ZZZZZ      Z    Z   Z   Z              Z      Z     ZZZZZ   Z    Z    Z
+Z                Z    Z       Z              Z   Z  Z     Z       Z    Z    Z
+Z     ZZZZZZZZZZZZ    ZZZZZZZZZZZZZZ         Z   Z        Z  ZZZZZZ    ZZZ  Z
+Z     Z          Z    Z                  ZZZZZZZZZZZZ   ZZZ  Z    Z    Z    Z
+Z     Z     Z    Z    Z        Z             Z            Z  Z              Z
+Z     Z     Z    Z    Z   ZZZZZZ             Z     ZZZZZZZZ  Z     ZZZZ     Z
+Z     Z     Z    Z    Z        ZZZZZZZZZ     Z     Z      Z  Z        Z   ZZZ
+Z     Z     Z    Z             Z             Z            Z  ZZZZZZZZZZ     Z
+Z     Z     Z    Z       Z     Z     ZZZZZZZZZZZZZZZZZZ   Z                 Z
+Z     Z     Z    Z       Z     Z     Z       Z        Z   Z                 Z
+Z     Z     ZZZZZZZZZZZZZZ     Z     Z                Z   ZZZZZZZZZZZZZZZ   Z
+Z                Z             Z     Z       ZZZZZZZZ     Z             Z   Z
+ZZZZZZZZZZZZZ    Z             Z             Z      ZZZZZZZ     Z   Z   Z   Z
+Z           Z    Z       Z     ZZZZZZZZZZZ   Z                  Z   Z   Z   Z
+Z    ZZZZ   Z    Z       Z     Z         Z   Z   ZZZZ     ZZZZZZZZZZZ   Z   Z
+Z    Z  Z   Z            Z     Z     ZZZZZ   Z   Z  Z     Z             Z   Z
+Z    Z  Z   Z            Z     Z             Z      Z     Z      ZZZZZZZZ   Z
+Z    Z      Z    ZZZZZZZZZ   ZZZZ   ZZZZZZZZZZZZZZZZZ     Z      Z          Z
+Z    ZZZZZZZZ    Z           Z Z                          Z      ZZZ        Z
+Z           Z    Z           Z ZZZZZZ   ZZZZZZZZZZZZZZZZZZZ      Z      Z   Z
+Z    ZZZZZZZZZZZZZZZZZZZZ    Z Z        Z    Z    Z   Z   Z      Z   ZZZZ   Z
+Z    Z                         Z                      Z   ZZZZZZZZ      Z   Z
+Z    ZZZZZZZZ   ZZZZZZZZZ    ZZZZZZZZ   ZZZZZZZZZ     Z   Z     Z       Z   Z
+Z               Z       Z    Z      Z           Z     Z   Z     ZZZZZ   Z   Z
+Z    ZZZZZZZZZZZZ       ZZZZZZ      ZZZZZZZZZZZZZ         Z             Z   Z
+ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
 .background_end
 
 .default_color fff00f
 
 .char_color_map
-'C'=D98643
+'Z'=D98643
 ' '=000000
