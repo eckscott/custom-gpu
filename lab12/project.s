@@ -1,12 +1,21 @@
 #####################################################################################
 #
-# project.s
+# drawing_program.s
 #
-# This program is a preliminary step into a digit recognizer. It allows the user to
-# toggle a pencil on or off with the switch of sw(0). When the pencil is on, the
-# user can use the buttons to move the pencil around the screen and draw a digit.
-# The idea is for the processor to calculate which digit is being drawn and display
-# the calculated digit on the seven segment display.
+# A VGA drawing program. The screen displays a large drawing space (like a piece
+# of paper on a desk). The character 'A' can be moved around the drawing space
+# using the directional buttons. When SW(0) is toggled ON, moving the character
+# leaves a copy of 'A' behind at each previous position, effectively "drawing"
+# with the letter. When SW(0) is OFF, the character moves cleanly without leaving
+# a trail.
+#
+# Controls:
+#   BTNU  - Move character up
+#   BTND  - Move character down
+#   BTNL  - Move character left
+#   BTNR  - Move character right
+#   BTNC  - Clear the drawing canvas (reset all drawn A's)
+#   SW(0) - OFF = move freely, ON = draw (leave A behind)
 #
 # Memory Organization:
 #   0x0000-0x1fff : text
@@ -14,8 +23,7 @@
 #   0x7f00-0x7fff : I/O
 #   0x8000-0xbfff : VGA
 #
-# The stack will operate in the data segment and thus starts at 0x3ffc 
-# and works its way down.
+# The stack operates in the data segment starting at 0x3ffc.
 #
 # Registers:
 #  x1(ra):  Return address
@@ -24,466 +32,398 @@
 #  x4(tp):  I/O base address
 #  x8(s0):  VGA base address
 #
-#
-####################################################################################3#
+#####################################################################################
 .globl  main
 
 .text
 
-
 # I/O address offset constants
-	.eqv LED_OFFSET 0x0
-	.eqv SWITCH_OFFSET 0x4
-	.eqv SEVENSEG_OFFSET 0x18
-	.eqv BUTTON_OFFSET 0x24
-	.eqv CHAR_COLOR_OFFSET 0x34
-	.eqv TIMER 0x30
+	.eqv LED_OFFSET         0x0
+	.eqv SWITCH_OFFSET      0x4
+	.eqv SEVENSEG_OFFSET    0x18
+	.eqv BUTTON_OFFSET      0x24
+	.eqv CHAR_COLOR_OFFSET  0x34
+	.eqv TIMER              0x30
 
-# I/O mask constants
-	.eqv BUTTON_C_MASK 0x01
-	.eqv BUTTON_L_MASK 0x02
-	.eqv BUTTON_D_MASK 0x04
-	.eqv BUTTON_R_MASK 0x08
-	.eqv BUTTON_U_MASK 0x10
+# Button mask constants
+	.eqv BUTTON_C_MASK  0x01
+	.eqv BUTTON_L_MASK  0x02
+	.eqv BUTTON_D_MASK  0x04
+	.eqv BUTTON_R_MASK  0x08
+	.eqv BUTTON_U_MASK  0x10
 
-# Game specific constants
-	.eqv CHAR_A 0x41					# ASCII 'A' (pencil character)
-	.eqv CHAR_A_RED 0x0fff00C1			# 'A' character with red foreground, black background
-	.eqv CHAR_C 0x43					# ASCII 'C'
-	.eqv CHAR_C_YELLOW 0x00fff0C3		# 'C' character with yellow foreground, black background
-	.eqv CHAR_Z 0x5A					# ASCII 'Z' (Desk character - can't go here)
-	.eqv CHAR_Z_MAGENTA 0x0f0f0fDA		# 'Z' character with magenta foreground, black background
-	.eqv CHAR_SPACE 0x20				# ASCII ' ' (for clearing the screen)
-	.eqv COLUMN_MASK 0x1fc				# Mask for the bits in the VGA address for the column
-	.eqv COLUMN_SHIFT 2					# Number of right shifts to determine VGA column
-	.eqv ROW_MASK 0x3e00				# Mask for the bits in the VGA address for the row
-	.eqv ROW_SHIFT 9					# Number of right shifts to determine VGA row
-	.eqv LAST_COLUMN 76					# 79 - last two columns don't show on screen
-	.eqv LAST_ROW 29					# 31 - last two rows don't show on screen
-	.eqv ADDRESSES_PER_ROW 512
+# Switch mask
+	.eqv SW0_MASK       0x01
+
+# Character constants
+	.eqv CHAR_A             0x41        # ASCII 'A' (moving character)
+	.eqv CHAR_A_MOVING      0x0fff00C1  # 'A' red foreground, black background (the cursor)
+	.eqv CHAR_A_DRAWN       0x00ffff41  # 'A' cyan foreground, black background (drawn/stamped)
+	.eqv CHAR_SPACE         0x20        # ASCII space (blank)
+	.eqv CHAR_SPACE_BLACK   0x00000020  # Space with black background (used to clear)
+
+# VGA layout constants
+	.eqv COLUMN_MASK        0x1fc       # Mask for column bits in VGA address
+	.eqv COLUMN_SHIFT       2           # Right shift amount to get column number
+	.eqv ROW_MASK           0x3e00      # Mask for row bits in VGA address
+	.eqv ROW_SHIFT          9           # Right shift amount to get row number
+	.eqv ADDRESSES_PER_ROW  512         # Bytes per row in VGA memory (128 cols * 4)
 	.eqv NEG_ADDRESSES_PER_ROW -512
-	.eqv STARTING_LOC 0x8f04		# The VGA memory address where the 'starting' character is located.
-						# 1,2 or 0x8000+1*4+2*512=0x8204
-                        # 60, 2 or 0x8000+60*4+2*512=0x8f04
-	.eqv PAPER_L_TOP_CORNER 0x8404              # The VGA memory address where the 'ending character' is located
-						# 16, 2 or 0x8000+16*4+2*512=0x8404
-	.eqv PAPER_R_BOTTOM_CORNER 0x9c00              # The VGA memory address where the 'block character' is located
-						# 64, 28 or 0x8000+64*4+28*512=0x9c00
-	.eqv SEGMENT_TIMER_INTERVAL 100     # This constant represents the number of timer ticks (each 1 ms)
-						# that are needed before incrementing the timer value on the seven
-						# segment display. With a value of 100, the timer will increment
-						# every 100 ms (or 10 times a second).
-	.eqv END_GAME_WAIT_INTERVAL 1000	# Wait one second before allowing a new game to start
 
-	.eqv INIT_FASTEST_SCORE 0xffff      # Fastest score initialized to 0xffff (should get lower with better play)
+# Drawing canvas boundaries
+# The canvas occupies columns 2..75 and rows 2..27 (leaving a 1-cell border)
+	.eqv CANVAS_LEFT_COL    2
+	.eqv CANVAS_RIGHT_COL   75
+	.eqv CANVAS_TOP_ROW     2
+	.eqv CANVAS_BOTTOM_ROW  27
+
+# Starting position of the 'A' cursor: column 72, row 3 (top-right of canvas)
+# VGA address = 0x8000 + col*4 + row*512 = 0x8000 + 72*4 + 3*512 = 0x8000 + 288 + 1536 = 0x8720
+	.eqv STARTING_LOC       0x8720
 
 main:
-
-	# The purpose of this initial section is to setup the global registers that
-	# will be used for the entire program execution. This setup portion will only
-	# be run once.
-
-	# Setup the stack pointer: sp = 0x3ffc
+	# Setup stack pointer: sp = 0x3ffc
 	li sp, 0x3ffc
-	# The previous "pseudo instruction" will be compiled into the following two instructions:
-	#  lui sp, 4		# 4 << 12 = 0x4000
-	#  addi sp, sp, -4		# 0x4000 - 4 = 0x3ffc
 
-	# setup the global pointer to the data segment (2<<12 = 0x2000)
+	# Setup global pointer to data segment (2<<12 = 0x2000)
 	lui gp, 2
 
 	# Prepare I/O base address
 	li tp, 0x7f00
- 
+
 	# Prepare VGA base address
 	li s0, 0x8000
 
-	# Call main program procedure
-	jal DRAW_SETUP
+	# Call main drawing program procedure
+	jal DRAWING_PROGRAM
 
-	# End in infinite loop (should never get here)
 END_MAIN:
 	j END_MAIN
 
+
 ################################################################################
 #
-# DRAW_SETUP
+# DRAWING_PROGRAM
 #
-#  This procedure contains the functionality of the game.
+#  Main procedure. Initializes the canvas, places the cursor, and enters the
+#  main input loop.
 #
 ################################################################################
-DRAW_SETUP:
+DRAWING_PROGRAM:
 
-	# Game initialization code that is only executed once.
+	# Setup stack frame
+	addi sp, sp, -4
+	sw ra, 0(sp)
 
-	# setup stack frame and save return address
-	addi sp, sp, -4	    # Make room to save return address on stack
-	sw ra, 0(sp)		# Put return address on stack
-
-	# Initialize the default color (based on the value at the starting location)
-	#  The default color is needed for VGA memories that are not initialized
-	#  with a default background.
-	li t0, STARTING_LOC                                # Address of starting location
-	lw t1, 0(t0)                                       # Read value at this address
-	# Shift right logical 8 bits (to bring the foreground and background for use by color offset)
+	# Initialize default VGA color from starting location
+	li t0, STARTING_LOC
+	lw t1, 0(t0)
 	srli t1, t1, 8
-	sw t1, CHAR_COLOR_OFFSET(tp)    # Write the new color values
+	sw t1, CHAR_COLOR_OFFSET(tp)
 
-	# Display a single blocking character
-	li t0, BLOCK_LOC
-	li t1, CHAR_Z_MAGENTA
-	sw t1, 0(t0)
+DP_RESTART:
+	# Clear the canvas (fill drawing area with spaces)
+	jal CLEAR_CANVAS
 
-	# Initialize the seven segment display with the default fastest time (0xffff)
-	li t1, INIT_FASTEST_SCORE
-	sw t1, SEVENSEG_OFFSET(tp)
-	# Initialize the LEDs with 0 (not a high score)
-	sw x0, LED_OFFSET(tp)
-
-MCG_RESTART:
-	# This occurs when we want to prepare for another game. We get here
-	# at power up, after a finished game, and after exiting a game with btnc.
-
-	# Write ending character at given location
-	lw t0, %lo(ENDING_CHARACTER)(gp)                   # Load character value to write
-	lw t1, %lo(ENDING_CHARACTER_LOC)(gp)               # Load address of character location
-	sw t0, 0(t1)
-
-	# Write moving character at starting location (without restore)
+	# Place the cursor at the starting location
 	li a0, STARTING_LOC
 	jal MOVE_CHARACTER
 
-MCG_NO_BUTTON_START:
-	# Make sure no buttons are being pressed before looking for button to start game
-	# (a previous button press to end the game or reset the game could lead to this
-	#  code entry. Need to wait until this button press is let go before proceeding).
-	lw t0, BUTTON_OFFSET(tp)
-	bne t0, x0, MCG_NO_BUTTON_START 
+	# Turn off LEDs (show nothing special)
+	sw x0, LED_OFFSET(tp)
 
-MCG_BUTTON_START:
-	# Wait for a new button press to start the game
+DP_NO_BUTTON:
+	# Wait until no buttons are pressed before looking for input
 	lw t0, BUTTON_OFFSET(tp)
-	beq t0, x0, MCG_BUTTON_START 
+	bne t0, x0, DP_NO_BUTTON
 
-	# A button has been pressed to start the game (t0)
-	# Copy button press value
+DP_WAIT_BUTTON:
+	# Wait for a button press
+	lw t0, BUTTON_OFFSET(tp)
+	beq t0, x0, DP_WAIT_BUTTON
+
+	# A button has been pressed; value is in t0
 	mv a0, t0
-	# Clear timer and seven segment display and LEDs
-	sw x0, SEVENSEG_OFFSET(tp)
-	sw x0, TIMER(tp)
-	sw x0, LED_OFFSET(tp)
-	
-MCG_PROC_BUTTONS:
-	# At this point a button has been pressed and its value is in a0
 
-	# See if btnc is pressed (to end game)
+DP_PROC_BUTTON:
+	# Check if BTNC is pressed -> clear canvas
 	li t0, BUTTON_C_MASK
-	beq t0, a0, MCG_END_GAME_EARLY
+	beq t0, a0, DP_RESTART
 
-	# btnc not pressed, process other button
-	jal UPDATE_CHAR_ADDR				# returns new address in a0
+	# Otherwise process directional button: compute new address
+	jal UPDATE_CHAR_ADDR     # returns new address in a0
 
-	# Move the character (a0 has new address)
-	jal MOVE_CHARACTER
-	
-	# See if the new location is the end location
-	lw t1, %lo(ENDING_CHARACTER_LOC)(gp)		# Load address of end location
-	beq t1, a0, MCG_GAME_ENDED
+	# Check SW(0) to decide draw mode
+	lw t0, SWITCH_OFFSET(tp)
+	andi t0, t0, SW0_MASK
+	beq t0, x0, DP_MOVE_FREE  # SW(0) OFF: move freely
 
-	# Continue playing game
-MCG_CONTINUE:
-	# Wait for button release while updating timer
-	jal UPDATE_TIMER
+DP_DRAW_MODE:
+	# SW(0) ON: stamp the drawn 'A' at the OLD location before moving
+	jal STAMP_CHARACTER        # stamp drawn-A at current (old) location
+	j DP_DO_MOVE
+
+DP_MOVE_FREE:
+	# SW(0) OFF: normal move (old position restored to what was there)
+
+DP_DO_MOVE:
+	jal MOVE_CHARACTER         # move cursor to new address (a0)
+
+DP_WAIT_RELEASE:
+	# Wait for button release
 	lw t0, BUTTON_OFFSET(tp)
-	bne x0, t0, MCG_CONTINUE
+	bne x0, t0, DP_WAIT_RELEASE
 
-	# Now that the button has been released, wait for a new button while updating timer
-MCG_CONTINUE_BTN:
-	jal UPDATE_TIMER
+DP_WAIT_NEXT:
+	# Wait for next button press
 	lw t0, BUTTON_OFFSET(tp)
-	beq x0, t0, MCG_CONTINUE_BTN
-	mv a0, t0               # copy button value to a0
-	j MCG_PROC_BUTTONS
+	beq x0, t0, DP_WAIT_NEXT
+	mv a0, t0
+	j DP_PROC_BUTTON
 
-MCG_GAME_ENDED:
-	# The character made it to the end. Stop updating display and keep latest
-	# score on the display. If the new score is less than the high score then
-	# display the LEDs to highlight a new fastest score.
-
-	lw t0, %lo(FASTEST_SCORE)(gp)		# Load fastest score
-	lw t1, SEVENSEG_OFFSET(tp)		# Load current score
-	slt t2, t1, t0				# Is new score less than fastest score?
-	beq t2, x0, MCG_GAME_ENDED_NO_NEW_FASTEST_SCORE
-	# Fall through when we have a new fastest score
-	addi t0, gp, %lo(FASTEST_SCORE)		# Compute address of fastest score memory location
-	sw t1, 0(t0)				# Update fastest score with new value
-	# Turn on all LEDs 
-	li t0, 0xffff
-	sw t0, LED_OFFSET(tp)
-	# Fall through to end the game
-
-MCG_GAME_ENDED_NO_NEW_FASTEST_SCORE:
-	# Wait for a bit just in case the user is pressing buttons fast and accidentally starts
-	# a new game before they see their score.
-	sw x0, TIMER(tp)			# Clear timer
-	li t1, END_GAME_WAIT_INTERVAL
-MCG_GAME_ENDED_WAIT:
-	lw t0, TIMER(tp)			# Load timer
-	blt t0, t1, MCG_GAME_ENDED_WAIT		# If timer is less than wait interval, keep waiting
-	# Fall through to restart game
-	j MCG_RESTART
-
-MCG_END_GAME_EARLY:
-	# When btnc is pressed, write a 0xffff to seven segment display (indicating bogus play)
-	# erase the current character, and prepare for new game
-	li t1, INIT_FASTEST_SCORE
-	sw t1, SEVENSEG_OFFSET(tp)
-	# Initialize the LEDs with 0 (not a high score)
-	sw x0, LED_OFFSET(tp)
-	# Move the current character to the start location
-	#li a0, STARTING_LOC
-	jal MOVE_CHARACTER
-	#li a0, STARTING_LOC
-	#li a1, 1
-	#jal MOVE_CHARACTER
-	# Restart game
-	j MCG_RESTART
-
-	# Should never get here. Will play game indefinitely
-MCG_EXIT:   # exit game procedure
-	# Restore stack
-	lw ra, 0(sp)		# Restore return address
-	addi sp, sp, 4		# Update stack pointer
-	ret                 # same as jalr x0, ra, 0
+DP_EXIT:
+	lw ra, 0(sp)
+	addi sp, sp, 4
+	ret
 
 
 ################################################################################
+#
+# CLEAR_CANVAS
+#
+#  Fills the canvas area (rows CANVAS_TOP_ROW..CANVAS_BOTTOM_ROW,
+#  cols CANVAS_LEFT_COL..CANVAS_RIGHT_COL) with blank space characters.
+#  Also resets DISPLACED_CHARACTER_LOC to 0 so MOVE_CHARACTER won't
+#  try to restore a stale location.
+#
+################################################################################
+CLEAR_CANVAS:
+
+	addi sp, sp, -4
+	sw ra, 0(sp)
+
+	# Reset displaced character tracking
+	addi t0, gp, %lo(DISPLACED_CHARACTER_LOC)
+	sw x0, 0(t0)
+
+	# Compute starting VGA address of canvas:
+	# addr = 0x8000 + CANVAS_LEFT_COL*4 + CANVAS_TOP_ROW*512
+	li t5, 0x8000
+	li t0, CANVAS_LEFT_COL
+	slli t0, t0, 2                  # col * 4
+	add t5, t5, t0
+	li t0, CANVAS_TOP_ROW
+	li t1, ADDRESSES_PER_ROW
+	mul t0, t0, t1                  # row * 512
+	add t5, t5, t0                  # t5 = VGA address of top-left canvas cell
+
+	# Number of rows and columns to clear
+	li t6, CANVAS_TOP_ROW           # current row counter
+	li s1, CANVAS_BOTTOM_ROW        # last row
+	li s2, CANVAS_LEFT_COL          # left column index
+	li s3, CANVAS_RIGHT_COL         # right column index
+
+	li a1, CHAR_SPACE_BLACK         # value to write (blank cell)
+
+CC_ROW_LOOP:
+	bgt t6, s1, CC_DONE            # done all rows?
+
+	# Reset column counter and base pointer for this row
+	li t4, CANVAS_LEFT_COL         # current column counter
+	# Compute row base address: t5 already points to left col of current row
+
+	mv t3, t5                      # t3 = current cell pointer
+
+CC_COL_LOOP:
+	bgt t4, s3, CC_NEXT_ROW        # done all cols in this row?
+	sw a1, 0(t3)                   # write blank
+	addi t3, t3, 4                 # next column
+	addi t4, t4, 1
+	j CC_COL_LOOP
+
+CC_NEXT_ROW:
+	addi t6, t6, 1                 # next row
+	li t0, ADDRESSES_PER_ROW
+	add t5, t5, t0                 # advance base pointer to next row
+	j CC_ROW_LOOP
+
+CC_DONE:
+	lw ra, 0(sp)
+	addi sp, sp, 4
+	ret
+
+
+################################################################################
+#
 # UPDATE_CHAR_ADDR
 #
-#  This procedure will read the current location of the character and update
-#  the address of the character based on the a0 parameter. The parameter is
-#  the value of the buttons and the updating will depend on whether up, down,
-#  left, or right is pressed. The new address will be returned in a0.
+#  Reads the current cursor location and computes a new address based on
+#  which directional button was pressed (passed in a0). Clamps movement
+#  to the canvas boundaries. Returns the new (or unchanged) address in a0.
 #
-#  a0: button values
-#  t0, t1: temporaries
-#  t2: address of character (to be updated)
-#  t3: current column
-#  t4: current row
-#
-#  returns in a0: New address of character location. If BTNC is pressed,
-#                 return 0 indicating an early end to the game.
+#  a0: button value (input), new VGA address (output)
 #
 ################################################################################
 UPDATE_CHAR_ADDR:
 
-	# setup stack frame and save return address
-	addi sp, sp, -4		# Make room to save return address on stack
-	sw ra, 0(sp)		# Put return address on stack
+	addi sp, sp, -4
+	sw ra, 0(sp)
 
-	# load current character address in t2
-	lw t2, %lo(DISPLACED_CHARACTER_LOC)(gp)	# Load address of current character
+	# Load current character address
+	lw t2, %lo(DISPLACED_CHARACTER_LOC)(gp)
 
-	# Compute the current column (t3) and row (t4) from the current character address
+	# If first call (address == 0), use starting location
+	bne t2, x0, UCA_COMPUTE_COLROW
+	li t2, STARTING_LOC
+
+UCA_COMPUTE_COLROW:
+	# Compute column (t3) and row (t4) from address
 	li t0, COLUMN_MASK
-	and t3, t0, t2					# Mask bits in address of column 
-	srli t3, t3, COLUMN_SHIFT		# Shift down to get column number
+	and t3, t0, t2
+	srli t3, t3, COLUMN_SHIFT
+
 	li t0, ROW_MASK
-	and t4, t0, t2					# Mask bits in address of row 
-	srli t4, t4, ROW_SHIFT			# Shift down to get column number
+	and t4, t0, t2
+	srli t4, t4, ROW_SHIFT
 
 UCA_CHECK_BTNR:
 	li t0, BUTTON_R_MASK
 	bne t0, a0, UCA_CHECK_BTNL
-	# Move pointer right (if not in last column)
-	li t1, LAST_COLUMN
-	beq t3, t1, UCA_DONE			# Last column, do nothing
-	addi t2, t2, 4					# Increment pointer
+	li t1, CANVAS_RIGHT_COL
+	bge t3, t1, UCA_DONE        # At right boundary
+	addi t2, t2, 4
 	j UCA_DONE
 
 UCA_CHECK_BTNL:
 	li t0, BUTTON_L_MASK
 	bne t0, a0, UCA_CHECK_BTND
-	# Move Pointer left (if not in first column)
-	beq x0, t3, UCA_DONE			# Too far left, skip
-	addi t2, t2, -4					# Decrement pointer
+	li t1, CANVAS_LEFT_COL
+	ble t3, t1, UCA_DONE        # At left boundary
+	addi t2, t2, -4
 	j UCA_DONE
 
 UCA_CHECK_BTND:
 	li t0, BUTTON_D_MASK
 	bne t0, a0, UCA_CHECK_BTNU
-	# Move pointer down
-	li t1, LAST_ROW
-	bge t4, t1, UCA_DONE			# Too far down, skip
-	addi t2, t2, ADDRESSES_PER_ROW	# Increment pointer
+	li t1, CANVAS_BOTTOM_ROW
+	bge t4, t1, UCA_DONE        # At bottom boundary
+	addi t2, t2, ADDRESSES_PER_ROW
 	j UCA_DONE
 
 UCA_CHECK_BTNU:
 	li t0, BUTTON_U_MASK
-	bne t0, a0, UCA_DONE			# Exit - no buttons matched
-	# Move pointer up
-	beq x0, t4, UCA_DONE					# Too far up, skip
-	addi t2, t2, NEG_ADDRESSES_PER_ROW		# Increment pointer
+	bne t0, a0, UCA_DONE
+	li t1, CANVAS_TOP_ROW
+	ble t4, t1, UCA_DONE        # At top boundary
+	addi t2, t2, NEG_ADDRESSES_PER_ROW
 
 UCA_DONE:
-	# Load the character at the new location. 
-	lw t0, 0(t2)
-	# Mask the bottom 7 bits (only the ASCII value, not its color)
-	andi t0, t0 0x7f
-	# Load the blocking character
-	lw t1, %lo(BLOCK_CHARACTER_VALUE)(gp)
-	# See if character at new position is same as blocking character. If so, don't move
-	bne t0, t1, UCA_RET
-	# New address is block wall. Go back and get original address (to prevent moving on block)
-	lw t2, %lo(DISPLACED_CHARACTER_LOC)(gp) 
-UCA_RET:
-	mv a0, t2			# Return updated character address
-	# Restore stack
-	lw ra, 0(sp)		# Restore return address
-	addi sp, sp, 4		# Update stack pointer
+	mv a0, t2
+	lw ra, 0(sp)
+	addi sp, sp, 4
 	ret
 
 
 ################################################################################
-# UPDATE_TIMER
 #
-#  This procedure will check the timer and update the seven segment display.
-#  If the timer has reached another tick value, increment the display.
-#  This procedure will return the current timer value.
+# STAMP_CHARACTER
+#
+#  Called in draw mode before moving. Writes the DRAWN version of 'A'
+#  (cyan foreground) at the current cursor location so it stays on screen.
+#  Also updates DISPLACED_CHARACTER to reflect this stamped value, so that
+#  MOVE_CHARACTER will restore this drawn-A (not erase it) if it ever comes
+#  back to this cell.
 #
 ################################################################################
-UPDATE_TIMER:
+STAMP_CHARACTER:
 
-	# setup stack frame and save return address
-	addi sp, sp, -4		# Make room to save return address on stack
-	sw ra, 0(sp)		# Put return address on stack
+	addi sp, sp, -4
+	sw ra, 0(sp)
 
-	# Read the value of the timer
-	lw t0, TIMER(tp)
-	# Load the timer interval constant
-	li t1, SEGMENT_TIMER_INTERVAL
-	# If they are equal, fall through and increment the seven segment display.
-	# Otherwise, exit the procedure (do nothing).
-	bne t1, t0, UT_DONE
-	# timer has reached the number of required ticks. incremenet seven segmeent display and clear timer
+	# Get current cursor location
+	lw t0, %lo(DISPLACED_CHARACTER_LOC)(gp)
+	beq t0, x0, SC_DONE         # No location yet, skip
 
-	# Clear timer by writing a 0 to it
-	sw x0, TIMER(tp)
-	# Load the current value being displayed on the seven segment display
-	lw t0, SEVENSEG_OFFSET(tp)
-	# Add 1 to this value
-	addi t0, t0, 1
-	# Update the seven segment display with this value
-	sw t0, SEVENSEG_OFFSET(tp)
-UT_DONE:
-	# Read the seven segment value and place it in a0 (return value)
-	lw a0, SEVENSEG_OFFSET(tp)
-	# Restore stack
-	lw ra, 0(sp)		# Restore return address
-	addi sp, sp, 4		# Update stack pointer
-	ret					# jalr x0, ra, 0
+	# Write the drawn-A value at the current location
+	li t1, CHAR_A_DRAWN
+	sw t1, 0(t0)
+
+	# Update the saved displaced character value to the drawn-A,
+	# so MOVE_CHARACTER restores the drawn-A (not a blank) when leaving
+	addi t2, gp, %lo(DISPLACED_CHARACTER)
+	sw t1, 0(t2)
+
+SC_DONE:
+	lw ra, 0(sp)
+	addi sp, sp, 4
+	ret
+
 
 ################################################################################
 #
 # MOVE_CHARACTER
 #
-# Moves the character to the new location and erases the character from the
-# previous location. This function doesn't check for valid addresses.
+#  Moves the cursor 'A' (red) to the new location given in a0.
+#  Restores the previously displaced character at the old location
+#  (unless in draw mode, where STAMP_CHARACTER already handled that).
+#  Saves the new location's old contents, then writes the moving 'A'.
 #
-# a0: memory address of new location of moving character
-#
-# a0 is not changed (returns the memory address provided as parameter)
+#  a0: VGA memory address of new cursor location (unchanged on return)
 #
 ################################################################################
 MOVE_CHARACTER:
 
-	# setup stack frame and save return address
-	addi sp, sp, -4		# Make room to save return address on stack
-	sw ra, 0(sp)		# Put return address on stack
+	addi sp, sp, -4
+	sw ra, 0(sp)
 
+	# Load old cursor location
+	lw t3, %lo(DISPLACED_CHARACTER_LOC)(gp)
 
-	# Load the address of the old character that was previously replaced
-	lw t3,%lo(DISPLACED_CHARACTER_LOC)(gp)
-	# If this address is zero, no need to restore character
+	# If zero (first call), skip restore
 	beq t3, x0, MC_SAVE_DISPLACED_CHAR
 
-	# Load the value of the character that was previously displaced
+	# Restore what was at the old location
 	lw t2, %lo(DISPLACED_CHARACTER)(gp)
-	# restore the character that was displaced
-	sw t2,0(t3)
+	sw t2, 0(t3)
 
-MC_SAVE_DISPLACED_CHAR:			# Save the address and value of the displaced character
-
-	# Load the value of the character that is going to be displaced (so it can be restored later)
+MC_SAVE_DISPLACED_CHAR:
+	# Save the value currently at the new location
 	lw t1, 0(a0)
-	# Load address of the displaced character location
-	addi t0,gp,%lo(DISPLACED_CHARACTER)
-	# Save the value of the displaced character
-	sw t1,0(t0)
-	# Save the address of the displaced character
-	addi t0,gp,%lo(DISPLACED_CHARACTER_LOC)
+	addi t0, gp, %lo(DISPLACED_CHARACTER)
+	sw t1, 0(t0)
+
+	# Save the new location address
+	addi t0, gp, %lo(DISPLACED_CHARACTER_LOC)
 	sw a0, 0(t0)
 
-MC_UPDATE_MOVING_CHAR:			# Write moving character to its new location
-
-	# Load the character value to write into the new location
+MC_UPDATE_MOVING_CHAR:
+	# Write the moving cursor 'A' (red) at the new location
 	lw t0, %lo(MOVING_CHARACTER)(gp)
-	# Write the new character (overwriting the old character)
 	sw t0, 0(a0)
 
 MC_EXIT:
-	lw ra, 0(sp)		# Restore return address
-	addi sp, sp, 4		# Update stack pointer
-	ret					# same as jalr x0, ra, 0
+	lw ra, 0(sp)
+	addi sp, sp, 4
+	ret
 
-
-	# You should always add three 'nop' instructions at the end of your program to make
-	# sure your pipeline always has a valid instruction. You should never get here.
 	nop
 	nop
 	nop
 
 ################################################################################
 # Data segment
-#
-#   The data segment is used to store global variables that are accessible by
-#   any of the procedures.
-#
 ################################################################################
 
 .data
 
-# This location stores the ASCII value of the character that will move around the screen
+# The cursor character: red 'A' on black background
 MOVING_CHARACTER:
-	.word CHAR_A_RED
+	.word CHAR_A_MOVING
 
-# This stores the value of the character that has been overwritten by the moved character.
-# It will be restored when the moving character moves off of its spot.
+# Value of the character that the cursor is currently covering
 DISPLACED_CHARACTER:
 	.word 0
 
-# This stores the ASCII value of the character that represents the destination location
-ENDING_CHARACTER:
-	.word CHAR_C_YELLOW
-
-# This stores the memory address of the moving character.
-# It is initialized to zero so that the first call will not restore a character
+# VGA address where the cursor currently sits (0 = not yet placed)
 DISPLACED_CHARACTER_LOC:
 	.word 0
-
-# This stores the memory address of the ending character location
-ENDING_CHARACTER_LOC:
-	.word ENDING_LOC
-
-# Storage for the fastest recorded score. Starts out with highest value
-FASTEST_SCORE:
-	.word INIT_FASTEST_SCORE
-
-# Storage for the last recorded score. Starts out with highest value
-LAST_SCORE:
-	.word INIT_FASTEST_SCORE
-
-# This stores the value of the character that acts as a "wall"
-BLOCK_CHARACTER_VALUE:
-	.word CHAR_Z
-
