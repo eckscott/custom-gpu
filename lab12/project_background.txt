@@ -1,0 +1,48 @@
+#################################################
+#
+# project_background.tXt
+#
+# This file provides the desk for the draw space
+#
+# Lines starting with a '#' are ignored and used for comments
+#
+#################################################
+
+.background_start
+ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ                                                                          
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ            
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ                                                                           
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZ                                       ZZZZZZZZZZZZZZZZZZZZ
+ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ                                                                           
+ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
+.background_end
+
+.default_color fff00f
+
+.char_color_map
+'Z'=D98643
+' '=000000

@@ -57,10 +57,10 @@
 
 # Character constants
 	.eqv CHAR_A             0x41        # ASCII 'A' (moving character)
-	.eqv CHAR_A_MOVING      0x0fff00C1  # 'A' red foreground, black background (the cursor)
-	.eqv CHAR_A_DRAWN       0x00ffff41  # 'A' cyan foreground, black background (drawn/stamped)
+	.eqv CHAR_A_MOVING      0xffffd041  # 'A' pencil yellow foreground, white background (the pencil)
+	.eqv CHAR_A_DRAWN       0xfff00042  # 'B' black foreground, white background (drawn/stamped)
 	.eqv CHAR_SPACE         0x20        # ASCII space (blank)
-	.eqv CHAR_SPACE_BLACK   0x00000020  # Space with black background (used to clear)
+	.eqv CHAR_SPACE_WHITE   0xffffff20  # Space with white background (used to clear)
 
 # VGA layout constants
 	.eqv COLUMN_MASK        0x1fc       # Mask for column bits in VGA address
@@ -72,14 +72,14 @@
 
 # Drawing canvas boundaries
 # The canvas occupies columns 2..75 and rows 2..27 (leaving a 1-cell border)
-	.eqv CANVAS_LEFT_COL    2
-	.eqv CANVAS_RIGHT_COL   75
+	.eqv CANVAS_LEFT_COL    19
+	.eqv CANVAS_RIGHT_COL   59
 	.eqv CANVAS_TOP_ROW     2
 	.eqv CANVAS_BOTTOM_ROW  27
 
-# Starting position of the 'A' cursor: column 72, row 3 (top-right of canvas)
-# VGA address = 0x8000 + col*4 + row*512 = 0x8000 + 72*4 + 3*512 = 0x8000 + 288 + 1536 = 0x8720
-	.eqv STARTING_LOC       0x8720
+# Starting position of the 'A' cursor: column 69, row 4 (top-right of canvas)
+# VGA address = 0x8000 + col*4 + row*512 = 0x8000 +  
+	.eqv STARTING_LOC       0x84EC
 
 main:
 	# Setup stack pointer: sp = 0x3ffc
@@ -213,8 +213,7 @@ CLEAR_CANVAS:
 	slli t0, t0, 2                  # col * 4
 	add t5, t5, t0
 	li t0, CANVAS_TOP_ROW
-	li t1, ADDRESSES_PER_ROW
-	mul t0, t0, t1                  # row * 512
+	slli t0, t0, 9                  # row * 512
 	add t5, t5, t0                  # t5 = VGA address of top-left canvas cell
 
 	# Number of rows and columns to clear
@@ -223,7 +222,7 @@ CLEAR_CANVAS:
 	li s2, CANVAS_LEFT_COL          # left column index
 	li s3, CANVAS_RIGHT_COL         # right column index
 
-	li a1, CHAR_SPACE_BLACK         # value to write (blank cell)
+	li a1, CHAR_SPACE_WHITE         # value to write (blank cell)
 
 CC_ROW_LOOP:
 	bgt t6, s1, CC_DONE            # done all rows?

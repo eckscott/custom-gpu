@@ -24,6 +24,21 @@ custom.bit: custom_font.dcp custom_background.mem
 project.bit: riscv_io_final.sv project_text.mem project_data.mem
 	vivado -mode batch -source implement_project.tcl -log project.log
 
+project.dcp: project.bit
+
+project_font.bit: project.dcp
+	vivado -mode batch -source ../resources/load_mem.tcl \
+		-tclargs updateFont project.dcp project_font.txt project_font.bit project_font.dcp
+
+project_font.dcp: project_font.bit
+
+project_background.mem: project_background.txt
+	python3 ../resources/generate_background.py $< $@
+
+project_background.bit: project_font.dcp project_background.mem
+	vivado -mode batch -source ../resources/load_mem.tcl \
+		-tclargs updateBackground project_font.dcp project_background.mem project_background.bit project_background.dcp
+
 #################################
 # Clean Rules
 #################################
