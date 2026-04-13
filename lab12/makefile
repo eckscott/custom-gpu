@@ -35,7 +35,7 @@ project_font.dcp: project_font.bit
 project_background.mem: project_background.txt
 	python3 ../resources/generate_background.py $< $@
 
-project_background.bit: project_font.dcp project_background.mem
+project_background.bit: project_background.mem
 	vivado -mode batch -source ../resources/load_mem.tcl \
 		-tclargs updateBackground project_font.dcp project_background.mem project_background.bit project_background.dcp
 

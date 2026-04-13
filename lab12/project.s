@@ -14,7 +14,8 @@
 #   BTND  - Move character down
 #   BTNL  - Move character left
 #   BTNR  - Move character right
-#   BTNC  - Clear the drawing canvas (reset all drawn A's)
+#   BTNC  - (First press) Run digit recognition, display result on 7-seg and LEDs
+#           (Second press while displaying) Clear canvas and restart
 #   SW(0) - OFF = move freely, ON = draw (leave A behind)
 #
 # Memory Organization:
@@ -72,14 +73,14 @@
 
 # Drawing canvas boundaries
 # The canvas occupies columns 2..75 and rows 2..27 (leaving a 1-cell border)
-	.eqv CANVAS_LEFT_COL    19
-	.eqv CANVAS_RIGHT_COL   59
-	.eqv CANVAS_TOP_ROW     2
-	.eqv CANVAS_BOTTOM_ROW  27
+	.eqv CANVAS_LEFT_COL    31
+	.eqv CANVAS_RIGHT_COL   44
+	.eqv CANVAS_TOP_ROW     7
+	.eqv CANVAS_BOTTOM_ROW  20
 
 # Starting position of the 'A' cursor: column 69, row 4 (top-right of canvas)
 # VGA address = 0x8000 + col*4 + row*512 = 0x8000 +  
-	.eqv STARTING_LOC       0x84EC
+	.eqv STARTING_LOC       0x9080
 
 main:
 	# Setup stack pointer: sp = 0x3ffc
@@ -129,8 +130,9 @@ DP_RESTART:
 	li a0, STARTING_LOC
 	jal MOVE_CHARACTER
 
-	# Turn off LEDs (show nothing special)
+	# Turn off LEDs and 7-seg (clean state)
 	sw x0, LED_OFFSET(tp)
+	sw x0, SEVENSEG_OFFSET(tp)
 
 DP_NO_BUTTON:
 	# Wait until no buttons are pressed before looking for input
@@ -143,12 +145,12 @@ DP_WAIT_BUTTON:
 	beq t0, x0, DP_WAIT_BUTTON
 
 	# A button has been pressed; value is in t0
-	mv a0, t0
+	add a0, t0, x0
 
 DP_PROC_BUTTON:
-	# Check if BTNC is pressed -> clear canvas
+	# Check if BTNC is pressed -> run inference
 	li t0, BUTTON_C_MASK
-	beq t0, a0, DP_RESTART
+	beq t0, a0, DP_RUN_INFERENCE
 
 	# Otherwise process directional button: compute new address
 	jal UPDATE_CHAR_ADDR     # returns new address in a0
@@ -161,7 +163,7 @@ DP_PROC_BUTTON:
 DP_DRAW_MODE:
 	# SW(0) ON: stamp the drawn 'A' at the OLD location before moving
 	jal STAMP_CHARACTER        # stamp drawn-A at current (old) location
-	j DP_DO_MOVE
+	jal x0, DP_DO_MOVE
 
 DP_MOVE_FREE:
 	# SW(0) OFF: normal move (old position restored to what was there)
@@ -178,8 +180,52 @@ DP_WAIT_NEXT:
 	# Wait for next button press
 	lw t0, BUTTON_OFFSET(tp)
 	beq x0, t0, DP_WAIT_NEXT
-	mv a0, t0
-	j DP_PROC_BUTTON
+	add a0, t0, x0
+	jal x0, DP_PROC_BUTTON
+
+DP_RUN_INFERENCE:
+	# Wait for BTNC to be released before starting inference
+	lw t0, BUTTON_OFFSET(tp)
+	bne x0, t0, DP_RUN_INFERENCE
+
+	# -----------------------------------------------------------------
+	# NEURON_LOOP placeholder
+	# Full forward-pass inference will go here.
+	# When complete, the predicted digit will be in a result register
+	# and certainty will be computed for the LEDs.
+	# -----------------------------------------------------------------
+	# TODO: implement inference loop
+	# For now, fall straight through to display.
+
+DIGIT_DISPLAY_LOOP:
+	# Display placeholder digit "1" on the seven-segment display
+	addi t0, x0, 1
+	sw t0, SEVENSEG_OFFSET(tp)
+
+	# Placeholder: LEDs show 0 certainty for now
+	sw x0, LED_OFFSET(tp)
+
+DDL_WAIT_RELEASE:
+	# Ensure BTNC is not currently held before we poll for next press
+	lw t0, BUTTON_OFFSET(tp)
+	bne x0, t0, DDL_WAIT_RELEASE
+
+DDL_WAIT_BTNC:
+	# Spin here until BTNC is pressed again
+	lw t0, BUTTON_OFFSET(tp)
+	beq x0, t0, DDL_WAIT_BTNC
+
+	# Check that it is specifically BTNC (ignore directional presses)
+	li t1, BUTTON_C_MASK
+	bne t0, t1, DDL_WAIT_BTNC
+
+DDL_BTNC_PRESSED:
+	# Clear the 7-seg and LEDs before restarting
+	sw x0, SEVENSEG_OFFSET(tp)
+	sw x0, LED_OFFSET(tp)
+
+	# Jump back to DP_RESTART to clear canvas and begin fresh
+	jal x0, DP_RESTART
 
 DP_EXIT:
 	lw ra, 0(sp)
@@ -225,26 +271,26 @@ CLEAR_CANVAS:
 	li a1, CHAR_SPACE_WHITE         # value to write (blank cell)
 
 CC_ROW_LOOP:
-	bgt t6, s1, CC_DONE            # done all rows?
+	blt s1, t6, CC_DONE            # done all rows?
 
 	# Reset column counter and base pointer for this row
 	li t4, CANVAS_LEFT_COL         # current column counter
 	# Compute row base address: t5 already points to left col of current row
 
-	mv t3, t5                      # t3 = current cell pointer
+	add t3, t5, x0                 # t3 = current cell pointer
 
 CC_COL_LOOP:
-	bgt t4, s3, CC_NEXT_ROW        # done all cols in this row?
+	blt s3, t4, CC_NEXT_ROW        # done all cols in this row?
 	sw a1, 0(t3)                   # write blank
 	addi t3, t3, 4                 # next column
 	addi t4, t4, 1
-	j CC_COL_LOOP
+	jal x0, CC_COL_LOOP
 
 CC_NEXT_ROW:
 	addi t6, t6, 1                 # next row
 	li t0, ADDRESSES_PER_ROW
 	add t5, t5, t0                 # advance base pointer to next row
-	j CC_ROW_LOOP
+	jal x0, CC_ROW_LOOP
 
 CC_DONE:
 	lw ra, 0(sp)
@@ -291,15 +337,15 @@ UCA_CHECK_BTNR:
 	li t1, CANVAS_RIGHT_COL
 	bge t3, t1, UCA_DONE        # At right boundary
 	addi t2, t2, 4
-	j UCA_DONE
+	jal x0, UCA_DONE
 
 UCA_CHECK_BTNL:
 	li t0, BUTTON_L_MASK
 	bne t0, a0, UCA_CHECK_BTND
 	li t1, CANVAS_LEFT_COL
-	ble t3, t1, UCA_DONE        # At left boundary
+	bge t1, t3, UCA_DONE        # At left boundary
 	addi t2, t2, -4
-	j UCA_DONE
+	jal x0, UCA_DONE
 
 UCA_CHECK_BTND:
 	li t0, BUTTON_D_MASK
@@ -307,17 +353,17 @@ UCA_CHECK_BTND:
 	li t1, CANVAS_BOTTOM_ROW
 	bge t4, t1, UCA_DONE        # At bottom boundary
 	addi t2, t2, ADDRESSES_PER_ROW
-	j UCA_DONE
+	jal x0, UCA_DONE
 
 UCA_CHECK_BTNU:
 	li t0, BUTTON_U_MASK
 	bne t0, a0, UCA_DONE
 	li t1, CANVAS_TOP_ROW
-	ble t4, t1, UCA_DONE        # At top boundary
+	bge t1, t4, UCA_DONE        # At top boundary
 	addi t2, t2, NEG_ADDRESSES_PER_ROW
 
 UCA_DONE:
-	mv a0, t2
+	add a0, t2, x0
 	lw ra, 0(sp)
 	addi sp, sp, 4
 	ret
