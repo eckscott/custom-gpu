@@ -1,13 +1,13 @@
 
 #####################################################################################
 #
-# drawing_program.s
+# project.s
 #
 # A VGA drawing program. The screen displays a large drawing space (like a piece
-# of paper on a desk). The character 'A' can be moved around the drawing space
-# using the directional buttons. When SW(0) is toggled ON, moving the character
-# leaves a copy of 'A' behind at each previous position, effectively "drawing"
-# with the letter. When SW(0) is OFF, the character moves cleanly without leaving
+# of paper on a desk). The character 'A' is a pencil that can be moved around the drawing
+# space using the buttons. When SW(0) is toggled ON, moving the character marks the
+# character 'B' behind at each previous position, effectively "drawing"
+# with the letter. When SW(0) is OFF, the pencil moves cleanly without leaving
 # a trail.
 #
 # Controls:
@@ -305,7 +305,7 @@ STORE_ACTIVATION:
 #
 ################################################################################
 LAYER_2_START:
-	li a1, L2_WEIGHTS	 # Pointer to start of L2 weights
+	li s1, L2_WEIGHTS	 # Pointer to start of L2 weights
 	li s4, L2_BIASES	 # Pointer to L2 bias values
 	li s7, OUTPUT_SCORES	 # Pointer to store L2 outputs
 	addi s6, x0, 0		 # current digit
@@ -319,12 +319,12 @@ L2_NEURON:
 L2_NEURON_LOOP:
 	beq t1, t2, L2_NEURON_DONE
 
-	lw t3, 0(s5) 		# Load L1 activation
-	lb t4, 0(a1) 		# Load weight
-	# mul t3, t3, t4    # multiply activation by weight
+	lw a0, 0(s5) 		# Load L1 activation
+	lb a1, 0(s1) 		# Load weight
+	jal multipy
 	add t0, t0, t3		# accumulate into sum
 
-	addi a1, a1, 1		# advance weight pointer
+	addi s1, s1, 1		# advance weight pointer
 	addi s5, s5, 4		# advance L1 output pointer
 	addi t1, t1, 1		# increment neuron counter
 	jal x0, L2_NEURON_LOOP
