@@ -83,6 +83,10 @@ logic [31:0] ex_op1, ex_temp_op2, ex_final_op2;
 logic load_use_hazard, branch_mem_taken, branch_wb_taken, loadPC;
 // Branch funct3 to determine which branch to perform
 logic [2:0] id_branch_f3, ex_branch_f3, mem_branch_f3;
+// Determine which load to perform based on funct3 code
+logic [2:0] id_load_f3, ex_load_f3, mem_load_f3, wb_load_f3;
+// intermediate signal to hold load data for load instructions
+logic [31:0] wb_load_data;
 
 
 //////////////////////////////////////////////////////////////////////
@@ -174,6 +178,8 @@ end
 
 // Assign func3 bits for pipelining
 assign id_branch_f3 = instruction[FUNCT3_MSB:FUNCT3_LSB];
+// Assign load func3 bits for pipelining
+assign id_load_f3 = instruction[FUNCT3_MSB:FUNCT3_LSB];
 
 /* Set id_ALUSrc to 1 for instructions that require an immediate value, and 0
    for all other instructions */
@@ -324,6 +330,7 @@ always_ff @(posedge clk)begin
         ex_rs2 <= 0;
         ex_writeReg <= 0;
         ex_branch_f3 <= 0;
+        ex_load_f3 <= 0;
     end
     else begin
         if (load_use_hazard || branch_mem_taken || branch_wb_taken) begin
@@ -331,12 +338,14 @@ always_ff @(posedge clk)begin
             ex_rs2 <= 0;
             ex_writeReg <= 0;
             ex_branch_f3 <= 0;
+            ex_load_f3 <= 0;
         end
         else begin
             ex_rs1 <= id_rs1;
             ex_rs2 <= id_rs2;
             ex_writeReg <= id_writeReg;
             ex_branch_f3 <= id_branch_f3;
+            ex_load_f3 <= id_load_f3;
         end
     end
 end
@@ -503,6 +512,7 @@ always_ff @(posedge clk) begin
         mem_alu_result <= 0;
         mem_read2 <= 0;
         mem_branch_f3 <= 0;
+        mem_load_f3 <= 0;
         mem_immUJ <= 0;
         mem_inst_op <= 0;
     end
@@ -513,6 +523,7 @@ always_ff @(posedge clk) begin
             mem_read2 <= 0;
             mem_Less_Than <= 0;
             mem_branch_f3 <= 0;
+            mem_load_f3 <= 0;
             mem_immUJ <= 0;
             mem_inst_op <= 0;
         end
@@ -522,6 +533,7 @@ always_ff @(posedge clk) begin
             mem_alu_result <= ex_final_alu_result;
             mem_read2 <= ex_mem2;
             mem_branch_f3 <= ex_branch_f3;
+            mem_load_f3 <= ex_load_f3;
             mem_immUJ <= ex_immUJ;
             mem_inst_op <= ex_inst_op;
         end
@@ -657,6 +669,7 @@ always_ff @(posedge clk) begin
         wb_RegWrite <= 1'b0;
         wb_writeReg <= 1'b0;
         wb_read2 <= 0;
+        wb_load_f3 <= 0;
     end
     else begin
         wb_alu_result <= mem_alu_result;
@@ -664,6 +677,7 @@ always_ff @(posedge clk) begin
         wb_RegWrite <= mem_RegWrite;
         wb_writeReg <= mem_writeReg;
         wb_read2 <= mem_read2;
+        wb_load_f3 <= mem_load_f3;
     end
 end
 
@@ -673,8 +687,21 @@ end
 //////////////////////////////////////////////////////////////////////
 
 
-// Assign writeBackData to be MemRead value if MemtoReg is high
-assign wb_writeData = wb_MemtoReg ? dReadData : wb_alu_result;
+/* MUX to determine what data to write back to the register file, either the
+*  word read from data for lw or just sign extended byte of data for lb*/
+always_comb begin
+    if (wb_MemtoReg) begin
+        case (wb_load_f3)
+            FUNCT3_LB:  wb_load_data = {{24{dReadData[7]}}, dReadData[7:0]};
+            FUNCT3_LW:  wb_load_data = dReadData;
+            default:    wb_load_data = dReadData;
+        endcase
+    end else begin
+        wb_load_data = wb_alu_result;
+    end
+end
+
+assign wb_writeData = wb_load_data;
 
 // Assign top level ports
 assign WriteBackData = wb_writeData;
