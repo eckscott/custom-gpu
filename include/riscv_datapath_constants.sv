@@ -96,4 +96,8 @@
     localparam FUNCT7_ADD = 7'b0000000;
     localparam FUNCT7_SRL = 7'b0000000;
 
+    // Different load operations based on Funct3 codes
+    localparam FUNCT3_LB = 3'b000;
+    localparam FUNCT3_LW = 3'b010;
+
 `endif
