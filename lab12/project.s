@@ -314,15 +314,14 @@ L2_NEURON:
 	addi t1, x0, 0	    # current neuron 
 	lb t0, 0(s4)  # accumulator (currently holds bias value)
 	li s5, HIDDEN_ACTIVATIONS # Pointer to L1 outputs
+	addi t2, x0, 32 	# Number of neurons in L2
 
 L2_NEURON_LOOP:
-	addi t2, x0, 32 	# Number of neurons in L2
 	beq t1, t2, L2_NEURON_DONE
 
 	lw t3, 0(s5) 		# Load L1 activation
 	lb t4, 0(a1) 		# Load weight
 	# mul t3, t3, t4    # multiply activation by weight
-	srai t3, t3, 6      # Adjust for fixed-point scaling (weights are in 6.2 fixed point)
 	add t0, t0, t3		# accumulate into sum
 
 	addi a1, a1, 1		# advance weight pointer
