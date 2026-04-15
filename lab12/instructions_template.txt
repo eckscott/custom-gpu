@@ -1,10 +1,16 @@
 ECEN 423 Lab #12 Project Instructions
 
-Name: <Full Name> (<Net ID>)
+Name: Ethan Scott (eckscott)
 
-Title: <Project Title>
+Title: Neural Network Based Digit Recognizer
 
 Instructions:
+
+When you load into the project, you will see what looks like a blank piece of paper on a desk with a yellow pencil icon.
+This pencil icon is how you draw, and can be moved around with btnu, btnd, btnr, and btnl.
+
+When you toggle on sw[0], you will start "drawing" by marking your current cell black. Once you have drawn a digit (0-9),
+press btnc and watch as the sevensegment display displays the digit it believes is correct!
 
 [Provide clear instructions on how to play your game including how to restart the game when it is over.
 You will lose points if the TA is unclear how to play or restart your game.]

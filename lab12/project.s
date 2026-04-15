@@ -219,9 +219,9 @@ DP_RUN_INFERENCE:
 ################################################################################
 
 NEURON_START:
-	li t2, L1_WEIGHTS	 # Pointer to start of L1 weights
-	li s4, L1_BIASES	 # Pointer to L1 bias values
-	li s5, HIDDEN_ACTIVATIONS # Pointer to store L1 outputs
+	la t2, L1_WEIGHTS	 # Pointer to start of L1 weights
+	la s4, L1_BIASES	 # Pointer to L1 bias values
+	la s5, HIDDEN_ACTIVATIONS # Pointer to store L1 outputs
 	addi s6, x0, 0		 # current neuron
 
 FIRST_LAYER_NEURON_LOOP:
@@ -274,7 +274,8 @@ SKIP_ADD:
 	beq x0, x0, INC_POINTERS
 
 ADVANCE_ROW:
-	addi t1, t1, INC_ROW_OFFSET - 4	# advance to next row (adjust for already adding 4 above)
+	addi t1, t1, INC_ROW_OFFSET	# advance to next row (adjust for already adding 4 above)
+	addi t1, t1, -4
 
 INC_POINTERS:
 	addi t1, t1, 4		# advance to next cell
@@ -305,15 +306,15 @@ STORE_ACTIVATION:
 #
 ################################################################################
 LAYER_2_START:
-	li s1, L2_WEIGHTS	 # Pointer to start of L2 weights
-	li s4, L2_BIASES	 # Pointer to L2 bias values
-	li s7, OUTPUT_SCORES	 # Pointer to store L2 outputs
+	la s1, L2_WEIGHTS	 # Pointer to start of L2 weights
+	la s4, L2_BIASES	 # Pointer to L2 bias values
+	la s7, OUTPUT_SCORES	 # Pointer to store L2 outputs
 	addi s6, x0, 0		 # current digit
 
 L2_NEURON:
 	addi t1, x0, 0	    # current neuron 
 	lb t0, 0(s4)  # accumulator (currently holds bias value)
-	li s5, HIDDEN_ACTIVATIONS # Pointer to L1 outputs
+	la s5, HIDDEN_ACTIVATIONS # Pointer to L1 outputs
 	addi t2, x0, 32 	# Number of neurons in L2
 
 L2_NEURON_LOOP:
@@ -321,8 +322,8 @@ L2_NEURON_LOOP:
 
 	lw a0, 0(s5) 		# Load L1 activation
 	lb a1, 0(s1) 		# Load weight
-	jal multipy
-	add t0, t0, t3		# accumulate into sum
+	jal multiply
+	add t0, t0, a0		# accumulate into sum
 
 	addi s1, s1, 1		# advance weight pointer
 	addi s5, s5, 4		# advance L1 output pointer
@@ -351,7 +352,7 @@ ARG_MAX:
 	addi t0, x0, -120		# current max value
 	addi t1, x0, 0			# index of current max value
 	addi t2, x0, 0			# current index
-	li s7, OUTPUT_SCORES # Pointer to start of L2 output scores
+	la s7, OUTPUT_SCORES # Pointer to start of L2 output scores
 	addi s8, x0, 10		# number of scores to process
 
 ARG_MAX_LOOP:
@@ -371,8 +372,7 @@ ARG_MAX_NEXT:
 DIGIT_DISPLAY_LOOP:
 	sw t1, SEVENSEG_OFFSET(tp)  	# Display index of max score on 7-seg (0-9)
 
-	# Placeholder: LEDs show 0 certainty for now
-	sw x0, LED_OFFSET(tp)
+	sw t0, LED_OFFSET(tp)
 
 DDL_WAIT_RELEASE:
 	# Ensure BTNC is not currently held before we poll for next press

@@ -21,7 +21,12 @@ custom.bit: custom_font.dcp custom_background.mem
 # Personal Project Rules
 #################################
 
-project.bit: riscv_io_final.sv project_text.mem project_data.mem
+project_text.mem: project.s multiply.s
+	java -jar ../resources/rars1_6.jar project.s multiply.s mc CompactTextAtZero \
+    a dump .text HexText project_text.mem \
+	a dump .data HexText project_data.mem a dump .text SegmentWindow project_text.txt
+
+project.bit: riscv_io_final.sv project_text.mem
 	vivado -mode batch -source implement_project.tcl -log project.log
 
 project.dcp: project.bit
@@ -35,7 +40,7 @@ project_font.dcp: project_font.bit
 project_background.mem: project_background.txt
 	python3 ../resources/generate_background.py $< $@
 
-project_background.bit: project_background.mem
+project_background.bit: project_background.mem project_font.dcp
 	vivado -mode batch -source ../resources/load_mem.tcl \
 		-tclargs updateBackground project_font.dcp project_background.mem project_background.bit project_background.dcp
 
@@ -49,3 +54,4 @@ clean: clean_iosystem
 	rm -rf .Xil xsim.dir
 	rm -f project_text.txt
 	rm -f project_data.txt
+	rm -f multiply_text.txt
