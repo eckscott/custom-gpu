@@ -13,9 +13,9 @@ custom_font.dcp: custom_font.bit
 custom_background.mem: custom_background.txt
 	python3 ../resources/generate_background.py $< $@
 
-custom.bit: custom_font.dcp custom_background.mem
+custom_background.bit: custom_font.dcp custom_background.mem
 	vivado -mode batch -source ../resources/load_mem.tcl \
-		-tclargs updateBackground custom_font.dcp custom_background.mem custom.bit custom.dcp
+		-tclargs updateBackground custom_font.dcp custom_background.mem custom_background.bit custom_background.dcp
 
 #################################
 # Personal Project Rules
