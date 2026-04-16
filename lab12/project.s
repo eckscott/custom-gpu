@@ -324,7 +324,11 @@ L2_NEURON_LOOP:
 
 	lw a0, 0(s5) 		# Load L1 activation
 	lb a1, 0(s1) 		# Load weight
-	jal multiply
+	addi sp, sp, -4
+	sw t0, 0(sp)		# Save accumulator on stack before call
+	jal multiply		# *** THIS IS A PROBLEM: This is where I'm running out of space. 320 calls to multiply each with 20 bytes = 6.4KB
+	lw t0, 0(sp)		# Restore accumulator
+	addi sp, sp, 4		# Clean up stack after restoring
 	add t0, t0, a0		# accumulate into sum
 
 	addi s1, s1, 1		# advance weight pointer
