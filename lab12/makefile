@@ -49,9 +49,10 @@ project_background.bit: project_background.mem project_font.dcp
 #################################
 
 clean: clean_iosystem
-	rm -f *.bit *.jou *.log *.rpt *.dcp *.pb *.wdb *.mem
+	rm -f *.bit *.jou *.log *.rpt *.dcp *.pb *.wdb
 	rm -f clockInfo.txt
 	rm -rf .Xil xsim.dir
 	rm -f project_text.txt
+	rm -f project_text.mem
 	rm -f project_data.txt
-	rm -f multiply_text.txt
+	rm -f project_data.mem

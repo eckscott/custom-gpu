@@ -1,0 +1,33 @@
+ECEN 423 Lab #12 Project Instructions
+
+Name: Ethan Scott (eckscott)
+
+Title: Neural Network Based Digit Recognizer
+
+Instructions:
+
+When you load into the project, you will see what looks like a blank piece of paper on a desk with a yellow pencil icon.
+This pencil icon is how you draw, and can be moved around with btnu, btnd, btnr, and btnl.
+
+When you toggle on sw[0], you will start "drawing" by marking your current cell black. Once you have drawn a digit (0-9),
+press btnc and watch as the sevensegment display displays the digit it believes is correct! Press btnc again to reset the cursor
+to the start and clear the canvas
+
+*** IMPORTANT NOTE: It doesn't actually predict well lol. I've tried debugging for a while and I think I've narrowed it down to
+***                 the fact that our chracter generator displays characters in a 8x16 pixel array, and every neural network that
+***                 I train in python first will scan a square area, so 8x8 or 14x14 or 16x16, which means the trained weights and biases
+***                 aren't actually what I need and therefore continue to predict incorrectly, but it's a good starting place to try to finish
+***                 this project another time if I could redo the font_rom!
+
+Custom characters: 'A' = pencil, 'B' = black square (drawn space), 'Z' = desk background
+
+Custom background: It's just supposed to look like a school desk so brown color with darker brown lines
+
+Procedures: project.s first call, multiply, drawing program, clear canvas
+
+Buttons: Move the pencil around
+
+LEDs and 7 Segment Display: Seven Segment display displays the predicted digit and LEDs show the confidence of that prediction (the final outputting score of the NN)
+
+Hardware Modifications: I implemented the load byte instructoin (lb) to my riscv_final.sv processor from lab11 to be able to save memory and load bytes for weights and biases,
+                        allowing me to store them in the data segment

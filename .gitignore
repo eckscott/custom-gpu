@@ -27,6 +27,5 @@ xelab.pb
 *.bit
 */.Xil
 *.out
-*.mem
 clockInfo.txt
 project_text.txt
