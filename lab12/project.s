@@ -288,7 +288,7 @@ NEURON_DONE: # ReLU
 	addi t0, x0, 0		# if sum is negative, store 0 as activation
 
 STORE_ACTIVATION:
-	srai t0, t0, 6		# Descale from Q2.6 fixed point format back to integer (divide by 64)
+	#srai t0, t0, 6		# Descale from Q2.6 fixed point format back to integer (divide by 64)
 	sw t0, 0(s5)		# store activation value for this neuron
 	addi s4, s4, 1      # advance bias pointer
 	addi s5, s5, 4		# advance to next output cell
@@ -332,7 +332,9 @@ L2_NEURON_LOOP:
 	jal x0, L2_NEURON_LOOP
 
 L2_NEURON_DONE:
-	srai t0, t0, 6		# Descale from Q2.6 fixed point format back to integer (divide by 64)
+	#addi t0, t0, 1028	# Help with rounding before destroying number with shift (equivalent to adding 0.5 in fixed point)
+	#addi t0, t0, 1028
+	#srai t0, t0, 12		# Descale from Q12.0 fixed point format back to integer (divide by 4096)
 	sw t0, 0(s7)		# store output score for this digit
 	addi s7, s7, 4		# advance output score pointer
 	addi s4, s4, 1      # advance bias pointer
@@ -351,7 +353,7 @@ L2_NEURON_DONE:
 ################################################################################
 
 ARG_MAX:
-	addi t0, x0, 0x800		# current max value
+	addi t0, x0, -255		# current max value
 	addi t1, x0, 0			# index of current max value
 	addi t2, x0, 0			# current index
 	la s7, OUTPUT_SCORES # Pointer to start of L2 output scores
